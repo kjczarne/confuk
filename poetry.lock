@@ -55,6 +55,17 @@ files = [
 graph = ["objgraph (>=1.7.2)"]
 
 [[package]]
+name = "easydict"
+version = "1.11"
+description = "Access dict values as attributes (works recursively)."
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "easydict-1.11.tar.gz", hash = "sha256:dcb1d2ed28eb300c8e46cd371340373abc62f7c14d6dea74fdfc6f1069061c78"},
+]
+
+[[package]]
 name = "isort"
 version = "5.13.2"
 description = "A Python utility / library to sort Python imports."
@@ -347,4 +358,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "e03fe82fe9a295f6724eb93ebcc69a71b29e7811767cc13126ed8cf2cf076a91"
+content-hash = "57ff43b46ea867cc25bbd0b53f4830f081dffacfa637b7b1f127931ef62ce46f"

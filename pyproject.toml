@@ -10,6 +10,7 @@ readme = "README.md"
 python = "^3.10"
 toml = "^0.10.2"
 pydantic = "^2.5.3"
+easydict = "^1.11"
 
 [tool.poetry.group.dev.dependencies]
 poethepoet = "^0.24.4"
