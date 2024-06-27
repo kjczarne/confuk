@@ -91,6 +91,10 @@ another_value = 2
 value = 3
 ```
 
+Note that you can use two special interpolation markers to specify paths in the import section:
+- `$this_dir` -> points to a directory relative to the TOML file that contains the `import` section
+- `$cwd` -> points to the current working directory
+
 > [!warning]
 > The preamble **will be removed** after it's processed. It's there only to control how `confuk` should process the loaded configuration files and it's dropped afterwards. Do not put any meaningful configuration into your preamble, except for `confuk`'s control elements.
 
