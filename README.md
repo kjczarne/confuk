@@ -1,3 +1,5 @@
+<img src="confuk-logo.png" width=150/>
+
 # Confuk
 
 This is yet another package for managing configuration files in Python projects.
