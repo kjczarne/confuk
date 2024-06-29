@@ -31,13 +31,11 @@ poetry add confuk
 
 ### Building from source
 
-Currently you can build the package using Poetry:
+You can build the package using Poetry:
 
 1. Clone this repo.
 2. Run `poetry build`.
 3. Grab the installable wheel from the `dist` folder and install it with `pip` or add the package as a local dependency of another project.
-
-Once I get some time to take care of it I will add the package to PyPI so that it's installable via a simple `pip install confuk` command.
 
 ## Special features
 
