@@ -1,4 +1,4 @@
-<img src="confuk-logo.png" width=150/>
+<img src="confuk-logo.drawio.png" width=150/>
 
 # Confuk
 

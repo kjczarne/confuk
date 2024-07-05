@@ -1,0 +1,22 @@
+<mxfile host="Electron" modified="2024-07-05T18:04:04.845Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.4.8 Chrome/124.0.6367.207 Electron/30.0.6 Safari/537.36" etag="YjxwPPgeysfl5PzoDDds" version="24.4.8" type="device">
+  <diagram name="Page-1" id="VQh6w6g7_aezDhghNg4-">
+    <mxGraphModel dx="489" dy="354" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="R7l5mha2bHE1yK-qSDqO-2" value="" style="shape=mxgraph.signs.transportation.tank;html=1;pointerEvents=1;fillColor=#CC6600;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;sketch=0;" vertex="1" parent="1">
+          <mxGeometry x="250" y="380" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="R7l5mha2bHE1yK-qSDqO-3" value="" style="shape=mxgraph.signs.transportation.tractor_1;html=1;pointerEvents=1;fillColor=#CC6600;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;sketch=0;" vertex="1" parent="1">
+          <mxGeometry x="90" y="404" width="99" height="76" as="geometry" />
+        </mxCell>
+        <mxCell id="R7l5mha2bHE1yK-qSDqO-6" value="" style="endArrow=diamondThin;endFill=1;endSize=24;html=1;rounded=0;strokeWidth=4;entryX=0.01;entryY=0.6;entryDx=0;entryDy=0;entryPerimeter=0;exitX=0.772;exitY=0.459;exitDx=0;exitDy=0;exitPerimeter=0;strokeColor=#CC6600;" edge="1" parent="1" source="R7l5mha2bHE1yK-qSDqO-3" target="R7l5mha2bHE1yK-qSDqO-2">
+          <mxGeometry width="160" relative="1" as="geometry">
+            <mxPoint x="200" y="450" as="sourcePoint" />
+            <mxPoint x="360" y="450" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
