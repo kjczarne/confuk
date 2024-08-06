@@ -5,11 +5,10 @@ on:
       - main
 jobs:
   Test-Job:
-    using: 'docker'
-    image: 'Dockerfile'
     steps:
       - name: Check out repository code
         uses: actions/checkout@v2
       - name: Run unit tests
+        uses: actions/run-tests
         run: |
           poetry run python -m pytest
