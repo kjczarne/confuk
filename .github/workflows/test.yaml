@@ -1,12 +1,17 @@
-name: Test
+name: Run all tests
 on:
-  push:
-    branches:
-      - main
+  pull_request:
+    types: [opened, edited, synchronize, ready_for_review, review_requested, reopened]
+
 jobs:
-  Test-Job:
+  run-tests:
+    runs-on: ubuntu-latest
     steps:
-      - name: Check out repository code
-        uses: actions/checkout@v2
-      - name: Run unit tests
-        uses: actions/run-tests
+      - name: Check out the repository
+        uses: actions/checkout@v4
+      - name: Install poetry
+        uses: abatilo/actions-poetry@v2
+      - name: Install the project dependencies and the `mdframe` package
+        run: poetry install
+      - name: Run all tests
+        run: poetry run python -m pytest
