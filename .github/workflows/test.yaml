@@ -1,0 +1,15 @@
+name: Test
+on:
+  push:
+    branches:
+      - main
+jobs:
+  Test-Job:
+    using: 'docker'
+    image: 'Dockerfile'
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+      - name: Run unit tests
+        run: |
+          poetry run python -m pytest
