@@ -1,14 +1,15 @@
 # action.yml
 name: 'Run Tests'
-description: 'Run Python tests using Poetry'
-# inputs:
-#   who-to-greet:  # id of input
-#     description: 'Who to greet'
-#     required: true
-#     default: 'World'
-# outputs:
-#   time: # id of output
-#     description: 'The time we greeted you'
+description: 'A GitHub Action to run tests using a Docker container'
 runs:
   using: 'docker'
   image: 'Dockerfile'
+  args:
+    - poetry
+    - run
+    - pytest
+inputs:
+  args:
+    description: 'Arguments to pass to the Docker container'
+    required: false
+    default: 'poetry run pytest'
