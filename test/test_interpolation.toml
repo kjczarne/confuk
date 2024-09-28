@@ -1,0 +1,5 @@
+[something.subsomething]
+lol = "omg"
+
+[something_else]
+value_str = "${something.subsomething.lol}_lol"
