@@ -4,9 +4,9 @@
 
 This is yet another package for managing configuration files in Python projects.
 
-It exposes one function that lets you provide a path to a TOML configuration file. It parses the config file into a dictionary by default. If a config class is provided when parsing, the class instance will be created using a dictionary of keyword arguments coming from the original TOML file.
+It exposes one function that lets you provide a path to a TOML/YAML/JSON configuration file. It parses the config file into a dictionary by default. If a config class is provided when parsing, the class instance will be created using a dictionary of keyword arguments coming from the original TOML/YAML/JSON file.
 
-In human words: I made this package so that I don't have to explicilty load, parse and return a class instance every single time I have something to do with a TOML file:
+In human words: I made this package so that I don't have to explicilty load, parse and return a class instance every single time I have something to do with a configuration file:
 
 ```python
 from confuk import parse_config
@@ -136,7 +136,7 @@ value = 3
 ```
 
 Note that you can use two special interpolation markers to specify paths in the import section:
-- `${this_dir}` -> points to a directory relative to the TOML file that contains the `import` section
+- `${this_dir}` -> points to a directory relative to the configuration file that contains the `import` section
 - `${cwd}` -> points to the current working directory
 
 > [!warning]
