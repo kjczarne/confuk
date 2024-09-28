@@ -1,6 +1,7 @@
 import toml
 import json
-from typing import Type, Any, Literal, Dict, List
+from typing import *
+from inspect import signature
 from pydantic import BaseModel
 from pathlib import Path
 from easydict import EasyDict as edict
@@ -15,6 +16,7 @@ SupportedCfgLiterals = Literal[
     "attr", "edict", "ed"
     "omega", "omegaconf", "o"
 ]
+SupportedConfigFormat = SupportedCfgLiterals | CfgClass | PydanticCfgClass | None
 
 
 def _build_repl_dict(config_file_path_path: Path) -> Dict[str, Any]:
@@ -135,46 +137,96 @@ def _parse_config_dict(config_file_path: Path) -> ConfigDict:
     return config_dict
 
 
-def _parse_config_kwarg_constructor(config_file_path: Path, cfg_class: CfgClass) -> CfgClass:
-    config_dict = _parse_config_dict(config_file_path)
+def _dict_to_kwarg_constructor(config_dict: ConfigDict, cfg_class: CfgClass) -> CfgClass:
     config = cfg_class(**config_dict)
     return config
+
+
+def _parse_config_kwarg_constructor(config_file_path: Path, cfg_class: CfgClass) -> CfgClass:
+    config_dict = _parse_config_dict(config_file_path)
+    return _dict_to_kwarg_constructor(config_dict, cfg_class)
+
+
+def _dict_to_pydantic(config_dict: ConfigDict, cfg_class: CfgClass) -> CfgClass:
+    return _dict_to_kwarg_constructor(config_dict, cfg_class)
 
 
 def _parse_config_pydantic(config_file_path: Path, cfg_class: PydanticCfgClass) -> BaseModel:
     return _parse_config_kwarg_constructor(config_file_path, cfg_class)
 
 
-def _parse_config_easydict(config_file_path: Path) -> edict:
-    config_dict = _parse_config_dict(config_file_path)
+def _dict_to_easydict(config_dict: ConfigDict) -> edict:
     return edict(config_dict)
 
 
-def _parse_omegaconfig(config_file_path: Path) -> OmegaConf:
+def _parse_config_easydict(config_file_path: Path) -> edict:
     config_dict = _parse_config_dict(config_file_path)
+    return _dict_to_easydict(config_dict)
+
+
+def _dict_to_omegaconfig(config_dict: ConfigDict) -> OmegaConfigDict:
     return OmegaConf.create(config_dict)
 
 
-def parse_config(config_file_path: Path, cfg_class: CfgClass | SupportedCfgLiterals | None = None):
+def _parse_omegaconfig(config_file_path: Path) -> OmegaConfigDict:
+    config_dict = _parse_config_dict(config_file_path)
+    return _dict_to_omegaconfig(config_dict)
+
+
+def parse_config(config_file_path_or_dict: Path | ConfigDict, cfg_class: SupportedConfigFormat = None):
     """Takes a path object to a toml file and returns a config object.
 
     Args:
-        config_file_path (Path): path to the toml file
-        cfg_class (CfgClass | Literal["attr"], optional): config loader class. Defaults to None.
+        config_file_path (Path | ConfigDict): path to the toml file or an existing `ConfigDict` instance
+        cfg_class (SupportedConfigFormat, optional): config loader class. Defaults to None.
             If set to `"attr"`, the config will be loaded as an `easydict` object instead
             of a conventional dictionary.
 
     Returns:
         An instance of the class used to load the config
     """
+
+    def _handle_dict_or_path(config_file_path_or_dict: Path | ConfigDict,
+                             dict_fn: Callable[[ConfigDict], Any],
+                             parse_fn: Callable[[Path, Any], Any] | Callable[[Path], Any]):
+        """Prepares a function to call depending on whether the input is a dictionary
+        of an existing config to be updated/post-processed, or a path to a config file
+        that has not been parsed yet.
+
+        Args:
+            config_file_path_or_dict (Path | ConfigDict): path to the config file or config dict
+            dict_fn (Callable): a function that converts a config dict to a desired output type
+            parse_fn (Callable): a function that parses a config file
+
+        Raises:
+            TypeError: If the signature of either of he functions is incorrect
+
+        Returns:
+            Any: desired config instance of a chosen type (dict, class, etc.)
+        """
+        match config_file_path_or_dict:
+            case Path():
+                # There are two kinds of signatures here, one which accepts `cfg_class`
+                # and one which doesn't
+                num_params_for_parse_fn = len(signature(parse_fn).parameters)
+                match num_params_for_parse_fn:
+                    case 2:
+                        return parse_fn(config_file_path_or_dict, cfg_class)
+                    case 1:
+                        return parse_fn(config_file_path_or_dict)
+                    case _:
+                        raise TypeError(f"Function {parse_fn.__name__} has {num_params_for_parse_fn}, this type of signature is unsupported.")
+            case dict(config_file_path_or_dict):
+                return dict_fn(config_file_path_or_dict)
+
     match cfg_class:
         case None | "dict" | "d":
-            return _parse_config_dict(config_file_path)
+            return _handle_dict_or_path(config_file_path_or_dict, dict, _parse_config_dict)
         case "attr" | "edict" | "ed":
-            return _parse_config_easydict(config_file_path)
+            return _handle_dict_or_path(config_file_path_or_dict, _dict_to_easydict, _parse_config_easydict)
         case "omega" | "omegaconf" | "o":
-            return _parse_omegaconfig(config_file_path)
+            return _handle_dict_or_path(config_file_path_or_dict, _dict_to_omegaconfig, _parse_omegaconfig)
         case BaseModel():
-            return _parse_config_pydantic(config_file_path, cfg_class)
+            return _handle_dict_or_path(config_file_path_or_dict, _dict_to_pydantic, _parse_config_pydantic)
         case _:
-            return _parse_config_kwarg_constructor(config_file_path, cfg_class)
+            return _handle_dict_or_path(config_file_path_or_dict, _dict_to_kwarg_constructor, _parse_config_kwarg_constructor)
