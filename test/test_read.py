@@ -11,13 +11,16 @@ class TestRead(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.path = Path(__file__).parent / "test.toml"
+        cls.path_json = Path(__file__).parent / "test.json"
+        cls.path_yaml = Path(__file__).parent / "test.yaml"
         cls.dct = {'my': {'mother': 1}, 'your': {'dad': {'father': 1}}}
 
     def _make_test_configs(self, args: Tuple[str]):
         configs = []
-        for arg in args:
-            cfg = parse_config(self.path, arg)
-            configs.append(cfg)
+        for path in (self.path, self.path_json, self.path_yaml):
+            for arg in args:
+                cfg = parse_config(path, arg)
+                configs.append(cfg)
         return configs
 
     def _make_test_type(self, cfg, type_: Type):

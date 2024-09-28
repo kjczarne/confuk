@@ -1,0 +1,8 @@
+{
+    "my": {"mother": 1},
+    "your": {
+        "dad": {
+            "father": 1
+        }
+    }
+}
