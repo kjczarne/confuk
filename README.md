@@ -88,9 +88,9 @@ cfg_dict = parse_config(Path("some.toml"), Metrics)  # returns a dictionary
 
 | Format      | `cfg_class` argument                               |
 | ----------- | -------------------------------------------------- |
-| `dict`      | `d` / `None`                                       |
-| `EasyDict`  | `ed` / `edict` / `attr`                            |
-| `OmegaConf` | `o` / `omega` / `omegaconf`                        |
+| `dict`      | `"d"` / `None`                                     |
+| `EasyDict`  | `"ed"` / `"edict"` / `"attr"`                      |
+| `OmegaConf` | `"o"` / `"omega"` / `"omegaconf"`                  |
 | `pydantic`  | `BaseModel` class                                  |
 | `custom`    | any class supporting `**kwargs` in the constructor |
 
