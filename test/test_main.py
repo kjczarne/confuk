@@ -23,6 +23,10 @@ class TestRead(unittest.TestCase):
         r = mock_main("my.mother=2")
         self.assertEqual(r.my.mother, 2)
 
+    def test_cli_config_override(self):
+        r = mock_main("--config", str(Path(__file__).parent / "test_imported.toml"))
+        self.assertEqual(r.something_else.value, 3)
+
 
 if __name__ == "__main__":
     unittest.main()
