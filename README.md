@@ -160,3 +160,37 @@ If you like the deeply nested folder-file structure for your configs then [Hydra
 `confuk` strives to be flatter: you import another config file in the preamble section and you have a choice of what to override. This makes it more comfortable to use when you have one `default.toml` config file for something and then create a bunch of configurations overriding certain values. This is useful for experiments in the AI/ML space, where I'm spending most of my time now.
 
 You are of course free to structure your files as you please but don't expect a feature similar to Hydra's `defaults` in `confuk` – I do indeed use Hydra for applications which require such a system!
+
+### Command-line overrides
+
+One of the most fantastic features I've found when using [Hydra](https://hydra.cc/) was the ability to override values from the config file on the command line. This is convenient when you want to quickly test some changes to your configuration without going through the trouble of creating a new config file.
+
+So I concluded it would be fun to implement it in `confuk` in a similar fashion. Here's how it works:
+
+```python
+import confuk
+
+
+@confuk.main(config=Path(__file__).parent / "test.toml", config_format="o", verbose=False)
+def main(cfg, *args):
+    console = Console()
+    console.print(cfg)
+    return cfg
+```
+
+This decorator behaves similarly to `@hydra.main` decorator and it creates a minimal argument parser for your application entrypoint under the hood.
+
+Now, when running the app, you can specify any value overrides on the command line. For example if your config looks like this:
+
+```toml
+[my]
+mother = 1
+
+[your.dad]
+father = 1
+```
+
+And you run your CLI app with the argument `your.dad.father=3`, you will override the pertinent value from `1` to `3`.
+
+> [!tip]
+> The underlying argument parser also contains a `--config` option. You can use it to switch to a different config path on the command line, without a need to rely on the default one that has been set in the decorator.
