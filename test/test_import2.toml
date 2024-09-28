@@ -1,0 +1,7 @@
+[pre]
+imports = [
+    "${this_dir}/test_imported.toml",
+]
+
+[something]
+value = 69
