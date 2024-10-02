@@ -1,3 +1,4 @@
+import re
 import toml
 import json
 from typing import *
@@ -7,6 +8,7 @@ from pathlib import Path
 from easydict import EasyDict as edict
 from omegaconf import OmegaConf, DictConfig as OmegaConfigDict
 from ruamel.yaml import YAML
+from copy import deepcopy
 
 CfgClass = Type[Any]
 PydanticCfgClass = Type[BaseModel]
@@ -19,13 +21,15 @@ SupportedCfgLiterals = Literal[
 SupportedConfigFormat = SupportedCfgLiterals | CfgClass | PydanticCfgClass | None
 
 
-def _build_repl_dict(config_file_path_path: Path) -> Dict[str, Any]:
+def _build_repl_dict(config_file_path: Path) -> Dict[str, Any]:
     """Builds a dict of variable replacements that are built into the config loader.
     Two formats are supported: `$something` (older) and `${something}` (newer, recommended).
     """
     repls = {
-        "$this_file": config_file_path_path,
-        "$this_dir": config_file_path_path.parent,
+        "$this_file": config_file_path,
+        "$this_dir": config_file_path.parent,
+        "$this_filename": config_file_path.name,
+        "$this_filename_stem": config_file_path.stem,
         "$cwd": Path.cwd()
     }
     repls_with_curly_braces = {"${" + f"{k.replace('$', '')}" + "}": v for k, v in repls.items()}
@@ -91,14 +95,46 @@ def _remove_preamble(config_dict: ConfigDict) -> ConfigDict:
     return config_dict
 
 
-def _handle_variable_interpolation(config_dict: ConfigDict):
+# def replacer(config_dict: ConfigDict, old_value: Any, new_value: Any):
+#     # If we want to switch to just string replacements from recursion,
+#     # we can use this function:
+#     config_str = json.dumps(config_dict)
+#     config_str = config_str.replace(old_value, str(new_value))
+#     print(config_str)
+#     return json.loads(config_str)
+
+
+def replacer(config_dict: ConfigDict, old_value: Any, new_value: Any):
+    match config_dict:
+        case dict(config_dict):
+            return {k: replacer(v, old_value, new_value) for k, v in config_dict.items()}
+        case list(config_dict):
+            return [replacer(v, old_value, new_value) for v in config_dict]
+        case str(config_dict):
+            return config_dict.replace(old_value, str(new_value))
+        case _:
+            return config_dict
+
+
+def _interpolate_special_variables(config_dict: ConfigDict, config_path: Path):
+    repls = _build_repl_dict(config_path)
+    config_dict_ = deepcopy(config_dict)
+    for k, v in repls.items():
+        config_dict_ = replacer(config_dict_, k, v)
+    return config_dict_
+
+
+def _handle_variable_interpolation(config_dict: ConfigDict, config_path: Path):
     # Lazy, but we borrow this from `omegaconf`, which is
     # the most brilliant package for configuration and
     # we support it as an output, so might as well use
-    # existing solutions to old problems:
-    config_odict = OmegaConfigDict(config_dict)
-    config = OmegaConf.create(config_odict)
-    return OmegaConf.to_container(config, resolve=True)
+    # existing solutions to old problems, except we need to
+    # interpolate a couple of our own tags:
+    config = _interpolate_special_variables(config_dict, config_path)
+    config = OmegaConfigDict(config)
+    config = OmegaConf.create(config)
+    config = OmegaConf.to_container(config, resolve=True)
+    return config
 
 
 def _parse_toml(config_file_path: Path) -> ConfigDict:
@@ -133,7 +169,7 @@ def _parse_config_dict(config_file_path: Path) -> ConfigDict:
 
     config_dict = _handle_preamble(config_dict, config_file_path)
     config_dict = _remove_preamble(config_dict)
-    config_dict = _handle_variable_interpolation(config_dict)
+    config_dict = _handle_variable_interpolation(config_dict, config_file_path)
     return config_dict
 
 
