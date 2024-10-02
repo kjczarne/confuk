@@ -3,3 +3,4 @@ lol = "omg"
 
 [something_else]
 value_str = "${something.subsomething.lol}_lol"
+path_to_this_file = "$this_file"

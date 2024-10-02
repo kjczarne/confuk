@@ -135,9 +135,11 @@ another_value = 2
 value = 3
 ```
 
-Note that you can use two special interpolation markers to specify paths in the import section:
+Note that you can use several special interpolation markers to specify paths in the import section:
 - `${this_dir}` -> points to a directory relative to the configuration file that contains the `import` section
 - `${cwd}` -> points to the current working directory
+- `${this_filename}` -> config filename (with extension)
+- `${this_filename_stem}` -> filename without the extension (stem)
 
 > [!warning]
 > The preamble **will be removed** after it's processed. It's there only to control how `confuk` should process the loaded configuration files and it's dropped afterwards. Do not put any meaningful configuration into your preamble, except for `confuk`'s control elements.
@@ -148,10 +150,36 @@ Unsupported. And I do not plan to add support for cherrypicking values from othe
 
 #### What about variable interpolation?
 
-This is supported with the syntax that [OmegaConf](https://omegaconf.readthedocs.io/) uses, e.g. `path = "${some.root.path}/file.txt"` will pick up the `path` variable from `some.root` config section.
+This is supported with the syntax that [OmegaConf](https://omegaconf.readthedocs.io/) uses, e.g. `path = "${some.root.path}/file.txt"` will pick up the `path` variable from `some.root` config section. The interpolation markers that I mentioned in the `Imports` section should also work anywhere else within the config, so you can use your `${this_filename_stem}` to refer to config names within the config itself. One use-case is when you want to have subdirectories in a `results` directory, where you would silo away the results from different configs:
+
+```toml
+results_dir = "results/${this_filename_stem}"
+```
+
+Assumming that you have 3 configs for your experiments: `ex1`, `ex2` and `ex3`, you could instead put `results_dir` in a parent config to all those:
+
+```toml
+# to_import.toml:
+results_dir = "results/${this_filename_stem}"
+
+# ex1
+[pre]
+imports = ["${this_dir}/to_import.toml"]
+a_variable_that_diverges_across_configs = 69
+
+# ex2
+[pre]
+imports = ["${this_dir}/to_import.toml"]
+a_variable_that_diverges_across_configs = 420
+
+# ex3
+[pre]
+imports = ["${this_dir}/to_import.toml"]
+a_variable_that_diverges_across_configs = 42
+```
 
 > [!note]
-> We are using `omegaconf` for this under the hood since they already have a great parser for this and there's no use duplicating work.
+> We are using `omegaconf` for all other interpolation tasks under the hood since they already have a great parser for this and there's no use duplicating work.
 
 #### What about deeply nested configs?
 

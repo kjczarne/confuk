@@ -11,7 +11,9 @@ class TestImport(unittest.TestCase):
 
     def test_import(self):
         ed = parse_config(self.path, "attr")
-        exp = {'something': {'subsomething': {'lol': 'omg'}}, 'something_else': {'value_str': 'omg_lol'}}
+        exp = {'something': {'subsomething': {'lol': 'omg'}},
+               'something_else': {'value_str': 'omg_lol',
+                                  'path_to_this_file': str(self.path)}}
         self.assertDictEqual(exp, ed)
         # Comparing also string representations because in `OmegaConf`
         # dictionary equality comparison is overridden and you will not notice
