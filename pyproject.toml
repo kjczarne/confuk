@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "confuk"
-version = "0.4.0"
+version = "0.4.1"
 description = "Very opinionated configuration loading package for Python projects"
 authors = ["Krzysztof J. Czarnecki <kjczarne@gmail.com>"]
 license = "MIT"

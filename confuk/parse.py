@@ -159,13 +159,17 @@ def _parse_json(config_file_path: Path) -> ConfigDict:
 
 def _parse_config_dict(config_file_path: Path) -> ConfigDict:
 
-    match config_file_path.suffix:
+    match config_file_path.suffix.lower():
         case ".toml":
             config_dict = _parse_toml(config_file_path)
         case ".yaml":
             config_dict = _parse_yaml(config_file_path)
         case ".json":
             config_dict = _parse_json(config_file_path)
+        case _:
+            if not config_file_path.exists():
+                raise ValueError(f"{config_file_path} does not exist")
+            raise ValueError(f"{config_file_path.suffix.upper()} config format is not supported")
 
     config_dict = _handle_preamble(config_dict, config_file_path)
     config_dict = _remove_preamble(config_dict)
