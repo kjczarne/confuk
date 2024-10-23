@@ -136,10 +136,13 @@ value = 3
 ```
 
 Note that you can use several special interpolation markers to specify paths in the import section:
+
 - `${this_dir}` -> points to a directory relative to the configuration file that contains the `import` section
 - `${cwd}` -> points to the current working directory
 - `${this_filename}` -> config filename (with extension)
 - `${this_filename_stem}` -> filename without the extension (stem)
+- `${this_dirname}` -> the name of the directory where the configuration file lives (not a path)
+- `${this_filename_suffix}` -> suffix (without the dot) of the current configuration file
 
 > [!warning]
 > The preamble **will be removed** after it's processed. It's there only to control how `confuk` should process the loaded configuration files and it's dropped afterwards. Do not put any meaningful configuration into your preamble, except for `confuk`'s control elements.

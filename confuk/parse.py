@@ -28,8 +28,10 @@ def _build_repl_dict(config_file_path: Path) -> Dict[str, Any]:
     repls = {
         "$this_file": config_file_path,
         "$this_dir": config_file_path.parent,
+        "$this_dirname": config_file_path.parent.name,
         "$this_filename": config_file_path.name,
         "$this_filename_stem": config_file_path.stem,
+        "$this_filename_suffix": config_file_path.suffix.replace(".", ""),
         "$cwd": Path.cwd()
     }
     repls_with_curly_braces = {"${" + f"{k.replace('$', '')}" + "}": v for k, v in repls.items()}
