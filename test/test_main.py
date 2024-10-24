@@ -28,5 +28,11 @@ class TestRead(unittest.TestCase):
         self.assertEqual(r.something_else.value, 3)
 
 
+    def test_none_casting(self):
+        r = mock_main("--config", str(Path(__file__).parent / "test_none_casting.yaml"), "--", "some.something=lol")
+        self.assertEqual(r.some.something, "lol")
+        self.assertIsInstance(r.some.something, str)
+
+
 if __name__ == "__main__":
     unittest.main()

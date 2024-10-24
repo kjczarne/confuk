@@ -55,7 +55,7 @@ def main(config: Path | str,
                 # Fetch the type of the value if it already exists and cast the type:
                 type_ = type(OmegaConf.select(cfg_omegaconf, key))
                 # ... but do it only if the type is actually known at this stage:
-                if type_ is not None:
+                if type_ is not type(None):
                     value = type_(value)
                 # Finally update the original config instance:
                 OmegaConf.update(cfg_omegaconf, key, value)
