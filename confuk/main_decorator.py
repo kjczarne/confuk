@@ -53,7 +53,10 @@ def main(config: Path | str,
                 if args.verbose:
                     console.print(f"Updating {key} with {value}")
                 # Fetch the type of the value if it already exists and cast the type:
-                value = type(OmegaConf.select(cfg_omegaconf, key))(value)
+                type_ = type(OmegaConf.select(cfg_omegaconf, key))
+                # ... but do it only if the type is actually known at this stage:
+                if type_ is not None:
+                    value = type_(value)
                 # Finally update the original config instance:
                 OmegaConf.update(cfg_omegaconf, key, value)
 
