@@ -61,7 +61,7 @@ def _handle_imports(imports_list: List[Path]) -> ConfigDict:
     out = {}
     for import_ in imports_list:
         import_dict = _parse_config_dict(import_)
-        out.update(import_dict)
+        out = _recursive_dict_update(out, import_dict)
     return out
 
 
