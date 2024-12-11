@@ -1,0 +1,8 @@
+[something]
+value = 1
+another_value = 2
+
+[something_else]
+value = 3
+name_of_final_file = "$[this_filename]"
+name_of_final_dir = "$[this_dir]"

@@ -1,0 +1,8 @@
+[pre]
+imports = [
+    "$this_dir/test_imported_lazy.toml",
+]
+
+[something]
+value = 69
+

@@ -147,9 +147,40 @@ Note that you can use several special interpolation markers to specify paths in 
 > [!warning]
 > The preamble **will be removed** after it's processed. It's there only to control how `confuk` should process the loaded configuration files and it's dropped afterwards. Do not put any meaningful configuration into your preamble, except for `confuk`'s control elements.
 
+#### Lazy interpolation
+
+By default the interpolation markers like `${this_filename}` will interpolate the _current_ file name. So if for example you create `a.yaml` and it contains:
+
+```yaml
+pre:
+  imports:
+    - b.yaml
+```
+
+And `b.yaml` contains:
+
+```yaml
+filename: "${this_filename}"
+```
+
+Then `filename` will be **`b.yaml`**. This is expected as these markers are interpolated as-is in the file they were found in.
+
+> [!important]
+> **If you want to defer the interpolation of these markers to happen in the final config file, use `$[]` markers instead**.
+
+So for example if you change `b.yaml` to contain:
+
+```yaml
+filename: "$[this_filename]"
+```
+
+Then `filename` will be `**a.yaml**` if you have called `parse_config` on the `a.yaml` file.
+
 #### What about inheriting selected values?
 
 Unsupported. And I do not plan to add support for cherrypicking values from other configs. It makes things way messier in my opinion, as it becomes way harder to reason about the flow of variables.
+
+As far as accessing other values within imported config, read the next section – that is supported via OmegaConf.
 
 #### What about variable interpolation?
 

@@ -21,11 +21,15 @@ SupportedCfgLiterals = Literal[
 SupportedConfigFormat = SupportedCfgLiterals | CfgClass | PydanticCfgClass | None
 
 
-def _build_repl_dict(config_file_path: Path) -> Dict[str, Any]:
-    """Builds a dict of variable replacements that are built into the config loader.
-    Two formats are supported: `$something` (older) and `${something}` (newer, recommended).
-    """
-    repls = {
+def _repls_with_lr_delimiters(repls: Dict[str, Any], lr_delimiters: Tuple[str, str] = ("{", "}")):
+    l, r = lr_delimiters
+    repls_with_curly_braces = {f"${l}" + f"{k.replace('$', '')}" + f"{r}": v for k, v in repls.items()}
+    repls.update(repls_with_curly_braces)
+    return repls
+
+
+def _build_repl_dict_without_delimiters(config_file_path: Path) -> Dict[str, Any]:
+    return {
         "$this_file": config_file_path,
         "$this_dir": config_file_path.parent,
         "$this_dirname": config_file_path.parent.name,
@@ -34,9 +38,19 @@ def _build_repl_dict(config_file_path: Path) -> Dict[str, Any]:
         "$this_filename_suffix": config_file_path.suffix.replace(".", ""),
         "$cwd": Path.cwd()
     }
-    repls_with_curly_braces = {"${" + f"{k.replace('$', '')}" + "}": v for k, v in repls.items()}
-    repls.update(repls_with_curly_braces)
-    return repls
+
+
+def _build_repl_dict(config_file_path: Path) -> Dict[str, Any]:
+    """Builds a dict of variable replacements that are built into the config loader.
+    Two formats are supported: `$something` (older) and `${something}` (newer, recommended).
+    """
+    repls = _build_repl_dict_without_delimiters(config_file_path)
+    return _repls_with_lr_delimiters(repls)
+
+
+def _build_leaf_repl_dict(config_file_path: Path) -> Dict[str, Any]:
+    repls = _build_repl_dict_without_delimiters(config_file_path)
+    return _repls_with_lr_delimiters(repls, (r"[", r"]"))
 
 
 def _variable_interpolation(ipt: str, key: str, repl_dict: Dict[str, Any]):
@@ -118,8 +132,10 @@ def replacer(config_dict: ConfigDict, old_value: Any, new_value: Any):
             return config_dict
 
 
-def _interpolate_special_variables(config_dict: ConfigDict, config_path: Path):
-    repls = _build_repl_dict(config_path)
+def _interpolate_special_variables(config_dict: ConfigDict,
+                                   config_path: Path,
+                                   repl_dict_fn: Callable[[Path], Dict[Any, Any]] = _build_repl_dict):
+    repls = repl_dict_fn(config_path)
     config_dict_ = deepcopy(config_dict)
     for k, v in repls.items():
         config_dict_ = replacer(config_dict_, k, v)
@@ -136,6 +152,11 @@ def _handle_variable_interpolation(config_dict: ConfigDict, config_path: Path):
     config = OmegaConfigDict(config)
     config = OmegaConf.create(config)
     config = OmegaConf.to_container(config, resolve=True)
+    return config
+
+
+def _handle_leaf_node_interpolation(config_dict: ConfigDict, config_path: Path):
+    config = _interpolate_special_variables(config_dict, config_path, _build_leaf_repl_dict)
     return config
 
 
@@ -179,13 +200,19 @@ def _parse_config_dict(config_file_path: Path) -> ConfigDict:
     return config_dict
 
 
+def _parse_leaf_config_dict(config_file_path: Path) -> ConfigDict:
+    config_dict = _parse_config_dict(config_file_path)
+    config_dict = _handle_leaf_node_interpolation(config_dict, config_file_path)
+    return config_dict
+
+
 def _dict_to_kwarg_constructor(config_dict: ConfigDict, cfg_class: CfgClass) -> CfgClass:
     config = cfg_class(**config_dict)
     return config
 
 
 def _parse_config_kwarg_constructor(config_file_path: Path, cfg_class: CfgClass) -> CfgClass:
-    config_dict = _parse_config_dict(config_file_path)
+    config_dict = _parse_leaf_config_dict(config_file_path)
     return _dict_to_kwarg_constructor(config_dict, cfg_class)
 
 
@@ -202,7 +229,7 @@ def _dict_to_easydict(config_dict: ConfigDict) -> edict:
 
 
 def _parse_config_easydict(config_file_path: Path) -> edict:
-    config_dict = _parse_config_dict(config_file_path)
+    config_dict = _parse_leaf_config_dict(config_file_path)
     return _dict_to_easydict(config_dict)
 
 
@@ -211,7 +238,7 @@ def _dict_to_omegaconfig(config_dict: ConfigDict) -> OmegaConfigDict:
 
 
 def _parse_omegaconfig(config_file_path: Path) -> OmegaConfigDict:
-    config_dict = _parse_config_dict(config_file_path)
+    config_dict = _parse_leaf_config_dict(config_file_path)
     return _dict_to_omegaconfig(config_dict)
 
 
@@ -263,7 +290,7 @@ def parse_config(config_file_path_or_dict: Path | ConfigDict, cfg_class: Support
 
     match cfg_class:
         case None | "dict" | "d":
-            return _handle_dict_or_path(config_file_path_or_dict, dict, _parse_config_dict)
+            return _handle_dict_or_path(config_file_path_or_dict, dict, _parse_leaf_config_dict)
         case "attr" | "edict" | "ed":
             return _handle_dict_or_path(config_file_path_or_dict, _dict_to_easydict, _parse_config_easydict)
         case "omega" | "omegaconf" | "o":
