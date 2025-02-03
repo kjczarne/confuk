@@ -9,6 +9,7 @@ from easydict import EasyDict as edict
 from omegaconf import OmegaConf, DictConfig as OmegaConfigDict
 from ruamel.yaml import YAML
 from copy import deepcopy
+from itertools import chain
 
 CfgClass = Type[Any]
 PydanticCfgClass = Type[BaseModel]
@@ -22,9 +23,9 @@ SupportedConfigFormat = SupportedCfgLiterals | CfgClass | PydanticCfgClass | Non
 
 COMMAND_MARKER = ":::"
 LEFT_DELIMITER, RIGHT_DELIMITER = "${", "}"
-DELIMITER_RE = r"\$\{.*\}"
+DELIMITER_RE = r"\$\{(.*?)\}"
 LEFT_DELIMITER_LAZY, RIGHT_DELIMITER_LAZY = "$[", "]"
-DELIMITER_RE_LAZY = r"\$\[.*\]"
+DELIMITER_RE_LAZY = r"\$\[(.*?)\]"
 
 
 def _repls_with_lr_delimiters(repls: Dict[str, Any], lr_delimiters: Tuple[str, str] = (LEFT_DELIMITER, RIGHT_DELIMITER)):
@@ -35,55 +36,62 @@ def _repls_with_lr_delimiters(repls: Dict[str, Any], lr_delimiters: Tuple[str, s
     return repls
 
 
-def _strip_delimiters(key: str) -> str:
-    """Utility function for stripping delimiters off the interpolation keys"""
-    if re.match(DELIMITER_RE, key) or re.match(DELIMITER_RE_LAZY, key):
-        return key[len(LEFT_DELIMITER):-len(RIGHT_DELIMITER)]
-    if re.match(r"\$.*", key):
-        return key[1:]
-    return key
+def _find_between_delimiters(ipt: str, lr_delimiter_pattern: str = DELIMITER_RE):
+    for m in re.finditer(lr_delimiter_pattern, ipt):
+        yield m
+
+
+def _replace_delimited_interpolation_variable(ipt: str, repl: str, lr_delimiter_pattern: str = DELIMITER_RE):
+    # The backslash escape is necessary when working with Windows Paths, nasty stuff:
+    return re.sub(lr_delimiter_pattern, repl.replace("\\", "\\\\"), ipt)
 
 
 def _apply_regex_repl_if_present(key: str,
                                  value: str, 
-                                 repl_command_delimiter: str = COMMAND_MARKER) -> Tuple[str, str]:
+                                 repl_command_delimiter: str = COMMAND_MARKER) -> str:
     """Parses sed-like substitution expressions, which can be used
     as interpolation keys.
     """
     if not repl_command_delimiter in key:
         # idempotent if no replacement command found:
         return key, value
-    key = _strip_delimiters(key)
-    marker, command = key.split(repl_command_delimiter)
-    command_segments = command.split("/")
-    cmd = command_segments[0]
-    flag_map = {
-        "": 0,
-        "m": re.M,
-        "l": re.L,
-        "i": re.I,
-        "a": re.A,
-        "s": re.S,
-        "u": re.U,
-        "x": re.X,
-        "d": re.DEBUG
-    }
-    match cmd:
-        case "s":
-            # Substitution
-            pattern, repl, flags = command_segments[1:]
-            # Split flags into letters and convert them to the enum flag
-            # that Python's `re` uses:
-            int_flag = 0
-            for f in flags:
-                try:
-                    flag_map[f] |= 0
-                except KeyError:
-                    raise KeyError(f"{f} flag is not recognized in the regex pattern")
-            return marker, re.sub(pattern, repl, value, flags=int_flag)
-        case _:
-            # Unsupported:
-            raise ValueError(f"{cmd} is not a supported command at interpolation")
+
+    output = key
+    for interpolation_marker in chain(_find_between_delimiters(key, DELIMITER_RE),
+                                      _find_between_delimiters(key, DELIMITER_RE_LAZY)):
+        interpolation_marker_ = interpolation_marker.group(1)
+        marker, command = interpolation_marker_.split(repl_command_delimiter)
+        command_segments = command.split("/")
+        cmd = command_segments[0]
+        flag_map = {
+            "": 0,
+            "m": re.M,
+            "l": re.L,
+            "i": re.I,
+            "a": re.A,
+            "s": re.S,
+            "u": re.U,
+            "x": re.X,
+            "d": re.DEBUG
+        }
+        match cmd:
+            case "s":
+                # Substitution
+                pattern, repl, flags = command_segments[1:]
+                # Split flags into letters and convert them to the enum flag
+                # that Python's `re` uses:
+                int_flag = 0
+                for f in flags:
+                    try:
+                        flag_map[f] |= 0
+                    except KeyError:
+                        raise KeyError(f"{f} flag is not recognized in the regex pattern")
+                regex_value_sub = re.sub(pattern, repl, value, flags=int_flag)
+                output = _replace_delimited_interpolation_variable(output, regex_value_sub, interpolation_marker.re)
+            case _:
+                # Unsupported:
+                raise ValueError(f"{cmd} is not a supported command at interpolation")
+    return output
 
 
 def _build_repl_dict_without_delimiters(config_file_path: Path) -> Dict[str, Any]:
@@ -207,7 +215,7 @@ def replacer(config_dict: ConfigDict, old_value: Any, new_value: Any):
         case str(config_dict):
             if COMMAND_MARKER in config_dict:
                 # Handle regex substitution of the value when requested:
-                _, config_dict = _apply_regex_repl_if_present(config_dict, str(new_value))
+                config_dict = _apply_regex_repl_if_present(config_dict, str(new_value))
                 return config_dict
             # k, v = _apply_regex_repl_if_present(old_value, str(new_value))
             return config_dict.replace(old_value, str(new_value))
