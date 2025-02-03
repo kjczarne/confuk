@@ -20,24 +20,88 @@ SupportedCfgLiterals = Literal[
 ]
 SupportedConfigFormat = SupportedCfgLiterals | CfgClass | PydanticCfgClass | None
 
+COMMAND_MARKER = ":::"
+LEFT_DELIMITER, RIGHT_DELIMITER = "${", "}"
+DELIMITER_RE = r"\$\{.*\}"
+LEFT_DELIMITER_LAZY, RIGHT_DELIMITER_LAZY = "$[", "]"
+DELIMITER_RE_LAZY = r"\$\[\]"
 
-def _repls_with_lr_delimiters(repls: Dict[str, Any], lr_delimiters: Tuple[str, str] = ("{", "}")):
+
+def _repls_with_lr_delimiters(repls: Dict[str, Any], lr_delimiters: Tuple[str, str] = (LEFT_DELIMITER, RIGHT_DELIMITER)):
+    """Builds a left-right wrapped delimiter, e.g. `$[...]` from `$...`"""
     l, r = lr_delimiters
-    repls_with_curly_braces = {f"${l}" + f"{k.replace('$', '')}" + f"{r}": v for k, v in repls.items()}
+    repls_with_curly_braces = {l + f"{k.replace('$', '')}" + r: v for k, v in repls.items()}
     repls.update(repls_with_curly_braces)
     return repls
 
 
-def _build_repl_dict_without_delimiters(config_file_path: Path) -> Dict[str, Any]:
-    return {
-        "$this_file": config_file_path,
-        "$this_dir": config_file_path.parent,
-        "$this_dirname": config_file_path.parent.name,
-        "$this_filename": config_file_path.name,
-        "$this_filename_stem": config_file_path.stem,
-        "$this_filename_suffix": config_file_path.suffix.replace(".", ""),
-        "$cwd": Path.cwd()
+def _strip_delimiters(key: str) -> str:
+    """Utility function for stripping delimiters off the interpolation keys"""
+    if re.match(DELIMITER_RE, key) or re.match(DELIMITER_RE_LAZY, key):
+        return key[len(LEFT_DELIMITER):-len(RIGHT_DELIMITER)]
+    if re.match(r"\$.*", key):
+        return key[1:]
+    return key
+
+
+def _apply_regex_repl_if_present(key: str,
+                                 value: str, 
+                                 repl_command_delimiter: str = COMMAND_MARKER) -> Tuple[str, str]:
+    """Parses sed-like substitution expressions, which can be used
+    as interpolation keys.
+    """
+    if not repl_command_delimiter in key:
+        # idempotent if no replacement command found:
+        return key, value
+    key = _strip_delimiters(key)
+    marker, command = key.split(repl_command_delimiter)
+    command_segments = command.split("/")
+    cmd = command_segments[0]
+    flag_map = {
+        "": 0,
+        "m": re.M,
+        "l": re.L,
+        "i": re.I,
+        "a": re.A,
+        "s": re.S,
+        "u": re.U,
+        "x": re.X,
+        "d": re.DEBUG
     }
+    match cmd:
+        case "s":
+            # Substitution
+            pattern, repl, flags = command_segments[1:]
+            # Split flags into letters and convert them to the enum flag
+            # that Python's `re` uses:
+            int_flag = 0
+            for f in flags:
+                try:
+                    flag_map[f] |= 0
+                except KeyError:
+                    raise KeyError(f"{f} flag is not recognized in the regex pattern")
+            return marker, re.sub(pattern, repl, value, flags=int_flag)
+        case _:
+            # Unsupported:
+            raise ValueError(f"{cmd} is not a supported command at interpolation")
+
+
+def _build_repl_dict_without_delimiters(config_file_path: Path) -> Dict[str, Any]:
+    """Builds a replacement map of key-value replacement pairs for
+    special interpolation markers without delimiters, just the `$`
+    front marker.
+    """
+    raw_map = {
+        "this_file": config_file_path,
+        "this_dir": config_file_path.parent,
+        "this_dirname": config_file_path.parent.name,
+        "this_filename": config_file_path.name,
+        "this_filename_stem": config_file_path.stem,
+        "this_filename_suffix": config_file_path.suffix.replace(".", ""),
+        "cwd": Path.cwd()
+    }
+    map_without_delimiters = {"$" + k: v for k, v in raw_map.items()}
+    return map_without_delimiters
 
 
 def _build_repl_dict(config_file_path: Path) -> Dict[str, Any]:
@@ -49,8 +113,14 @@ def _build_repl_dict(config_file_path: Path) -> Dict[str, Any]:
 
 
 def _build_leaf_repl_dict(config_file_path: Path) -> Dict[str, Any]:
+    """Builds a dict of variable replacements that will be lazy-loaded,
+    i.e. loaded at the leaf node when recursing through the config.
+    This is useful when you want to e.g. defer interpolation of a
+    config filename until the 'importer' of that config file
+    picks it up.
+    """
     repls = _build_repl_dict_without_delimiters(config_file_path)
-    return _repls_with_lr_delimiters(repls, (r"[", r"]"))
+    return _repls_with_lr_delimiters(repls, (LEFT_DELIMITER_LAZY, RIGHT_DELIMITER_LAZY))
 
 
 def _variable_interpolation(ipt: str, key: str, repl_dict: Dict[str, Any]):
@@ -63,6 +133,7 @@ def _variable_interpolation(ipt: str, key: str, repl_dict: Dict[str, Any]):
 
 
 def _handle_import_path(config_file_path_path: Path, import_path: Path | str) -> Path:
+    """Infers full import paths"""
     repls = _build_repl_dict(config_file_path_path)
     for key in repls.keys():
         import_path = _variable_interpolation(import_path, key, repls)
@@ -72,6 +143,9 @@ def _handle_import_path(config_file_path_path: Path, import_path: Path | str) ->
 
 
 def _handle_imports(imports_list: List[Path]) -> ConfigDict:
+    """Updates the config dict top-down recursively and builds
+    a full configuration out of the import list
+    """
     out = {}
     for import_ in imports_list:
         import_dict = _parse_config_dict(import_)
@@ -80,6 +154,7 @@ def _handle_imports(imports_list: List[Path]) -> ConfigDict:
 
 
 def _recursive_dict_update(d: ConfigDict, u: ConfigDict) -> ConfigDict:
+    """Utility function for updating dictionaries recursively"""
     for k, v in u.items():
         if isinstance(v, dict):
             d[k] = _recursive_dict_update(d.get(k, {}), v)
@@ -89,6 +164,7 @@ def _recursive_dict_update(d: ConfigDict, u: ConfigDict) -> ConfigDict:
 
 
 def _handle_preamble(config_dict: ConfigDict, config_file_path: Path) -> ConfigDict:
+    """Processes file preamble, including the import section"""
     if "pre" in config_dict.keys():
         pre = config_dict["pre"]
         if "imports" in pre.keys():
@@ -106,6 +182,7 @@ def _handle_preamble(config_dict: ConfigDict, config_file_path: Path) -> ConfigD
 
 
 def _remove_preamble(config_dict: ConfigDict) -> ConfigDict:
+    """Gets rid of the preamble from the final config output"""
     if "pre" in config_dict.keys():
         del config_dict["pre"]
     return config_dict
@@ -121,12 +198,18 @@ def _remove_preamble(config_dict: ConfigDict) -> ConfigDict:
 
 
 def replacer(config_dict: ConfigDict, old_value: Any, new_value: Any):
+    """Recursive multi-type replacer for special interpolation markers"""
     match config_dict:
         case dict(config_dict):
             return {k: replacer(v, old_value, new_value) for k, v in config_dict.items()}
         case list(config_dict):
             return [replacer(v, old_value, new_value) for v in config_dict]
         case str(config_dict):
+            if COMMAND_MARKER in config_dict:
+                # Handle regex substitution of the value when requested:
+                _, config_dict = _apply_regex_repl_if_present(config_dict, str(new_value))
+                return config_dict
+            # k, v = _apply_regex_repl_if_present(old_value, str(new_value))
             return config_dict.replace(old_value, str(new_value))
         case _:
             return config_dict
@@ -135,6 +218,9 @@ def replacer(config_dict: ConfigDict, old_value: Any, new_value: Any):
 def _interpolate_special_variables(config_dict: ConfigDict,
                                    config_path: Path,
                                    repl_dict_fn: Callable[[Path], Dict[Any, Any]] = _build_repl_dict):
+    """Handles the interpolation of special markers before
+    the OmegaConf backend
+    """
     repls = repl_dict_fn(config_path)
     config_dict_ = deepcopy(config_dict)
     for k, v in repls.items():
@@ -143,6 +229,9 @@ def _interpolate_special_variables(config_dict: ConfigDict,
 
 
 def _handle_variable_interpolation(config_dict: ConfigDict, config_path: Path):
+    """Interpolates our own interpolation markers, then calls on OmegaConf
+    to handle reference-based markers.
+    """
     # Lazy, but we borrow this from `omegaconf`, which is
     # the most brilliant package for configuration and
     # we support it as an output, so might as well use
@@ -156,6 +245,7 @@ def _handle_variable_interpolation(config_dict: ConfigDict, config_path: Path):
 
 
 def _handle_leaf_node_interpolation(config_dict: ConfigDict, config_path: Path):
+    """Applies interpolation at the leaf-level in the import recursive walk."""
     config = _interpolate_special_variables(config_dict, config_path, _build_leaf_repl_dict)
     return config
 
