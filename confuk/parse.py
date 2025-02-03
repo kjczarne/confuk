@@ -24,7 +24,7 @@ COMMAND_MARKER = ":::"
 LEFT_DELIMITER, RIGHT_DELIMITER = "${", "}"
 DELIMITER_RE = r"\$\{.*\}"
 LEFT_DELIMITER_LAZY, RIGHT_DELIMITER_LAZY = "$[", "]"
-DELIMITER_RE_LAZY = r"\$\[\]"
+DELIMITER_RE_LAZY = r"\$\[.*\]"
 
 
 def _repls_with_lr_delimiters(repls: Dict[str, Any], lr_delimiters: Tuple[str, str] = (LEFT_DELIMITER, RIGHT_DELIMITER)):
