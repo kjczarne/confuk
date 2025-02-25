@@ -256,3 +256,26 @@ And you run your CLI app with the argument `your.dad.father=3`, you will overrid
 
 > [!tip]
 > The underlying argument parser also contains a `--config` option. You can use it to switch to a different config path on the command line, without a need to rely on the default one that has been set in the decorator.
+
+### Dumping configs
+
+This is mostly for debugging purposes.
+
+Sometimes, when you use a lot of imports it might be hard to figure out what is the final config form after all the imports have been resolved. Starting from version `0.8.0` you can now dump your configs to JSON, YAML, TOML, Pickle and JSONPickle and the routing is done using file extensions:
+
+- `*.json` – dump to JSON
+- `*.yaml` – dump to YAML
+- `*.toml` – dump to TOML
+- `*.jsonp` – dump to JSONPickle
+- `*.pkl` – dump to Pickle
+
+To perform the dumping just use:
+
+```python
+from confuk import dump_config
+
+dump_config(cfg, "some_cfg.json")
+```
+
+> [!warning]
+> Not all types in your config object might be serializable, especially if you're using custom classes. When loading a config using `omegaconf` adapter, we're ensuring that the output is serialized properly, with other config backends it might not be so pretty at the moment. If you're running into trouble my suggestion is to dump to a Pickle and use something like [objexplore](https://github.com/kylepollina/objexplore) to load the Pickle back again and explore the contents of the constructed config.
