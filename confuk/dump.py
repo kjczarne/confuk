@@ -1,4 +1,6 @@
 import json
+import jsonpickle
+import pickle
 import toml
 from ruamel.yaml import YAML
 from .parse import ConfigDict
@@ -26,6 +28,16 @@ def _dump_json(config: ConfigDict, dump_path: Path):
         json.dump(config, f)
 
 
+def _dump_jsonpickle(config: ConfigDict, dump_path: Path):
+    with open(dump_path, "w") as f:
+        f.write(jsonpickle.encode(config))
+
+
+def _dump_pickle(config: ConfigDict, dump_path: Path):
+    with open(dump_path, "wb") as f:
+        pickle.dump(config, f)
+
+
 def dump_config(config: ConfigDict, path: Path | str, create_parents: bool = True):
     if isinstance(path, str):
         path = Path(path)
@@ -34,6 +46,10 @@ def dump_config(config: ConfigDict, path: Path | str, create_parents: bool = Tru
     match path.suffix.lower():
         case ".json":
             _dump_json(config, path)
+        case ".jsonp":
+            _dump_jsonpickle(config, path)
+        case ".pkl":
+            _dump_pickle(config, path)
         case ".toml":
             _dump_toml(config, path)
         case ".yaml":
