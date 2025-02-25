@@ -2,6 +2,7 @@ import json
 import jsonpickle
 import pickle
 import toml
+from omegaconf import DictConfig as OmegaConfDictConfig, OmegaConf
 from ruamel.yaml import YAML
 from .parse import ConfigDict
 from pathlib import Path
@@ -38,11 +39,21 @@ def _dump_pickle(config: ConfigDict, dump_path: Path):
         pickle.dump(config, f)
 
 
+def _omegaconf_container(config: OmegaConfDictConfig) -> ConfigDict:
+    return OmegaConf.to_container(config, resolve=True)
+
+
 def dump_config(config: ConfigDict, path: Path | str, create_parents: bool = True):
+
     if isinstance(path, str):
         path = Path(path)
+
     if create_parents:
         path.parent.mkdir(parents=True, exist_ok=True)
+
+    if isinstance(config, OmegaConfDictConfig):
+        config = _omegaconf_container(config)
+
     match path.suffix.lower():
         case ".json":
             _dump_json(config, path)
