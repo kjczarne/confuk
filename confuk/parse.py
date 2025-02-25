@@ -242,7 +242,8 @@ def _parse_omegaconfig(config_file_path: Path) -> OmegaConfigDict:
     return _dict_to_omegaconfig(config_dict)
 
 
-def parse_config(config_file_path_or_dict: Path | ConfigDict, cfg_class: SupportedConfigFormat = None):
+def parse_config(config_file_path_or_dict: Path | ConfigDict | str,
+                 cfg_class: SupportedConfigFormat = None):
     """Takes a path object to a toml file and returns a config object.
 
     Args:
@@ -274,7 +275,9 @@ def parse_config(config_file_path_or_dict: Path | ConfigDict, cfg_class: Support
             Any: desired config instance of a chosen type (dict, class, etc.)
         """
         match config_file_path_or_dict:
-            case Path():
+            case Path() | str():
+                # Ensure downstream the `Path` object is used consistently:
+                config_file_path_or_dict = Path(config_file_path_or_dict)
                 # There are two kinds of signatures here, one which accepts `cfg_class`
                 # and one which doesn't
                 num_params_for_parse_fn = len(signature(parse_fn).parameters)
