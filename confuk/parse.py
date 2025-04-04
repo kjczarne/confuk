@@ -302,3 +302,39 @@ def parse_config(config_file_path_or_dict: Path | ConfigDict | str,
             return _handle_dict_or_path(config_file_path_or_dict, _dict_to_pydantic, _parse_config_pydantic)
         case _:
             return _handle_dict_or_path(config_file_path_or_dict, _dict_to_kwarg_constructor, _parse_config_kwarg_constructor)
+
+
+def flatten(config_dict: OmegaConfigDict | ConfigDict,
+            parent_key: str = "",
+            filter_: Iterable[str] | None = None,
+            use_parent_key_for_filter: bool = False) -> Dict[str, Any]:
+    """Flattens the config object to use dotlist keys, e.g.
+    `{"a": {"b": [1, 2, 3]}}` will become `{"a.b": [1, 2, 3]}`
+
+    Args:
+        config_dict (OmegaConfigDict): parsed config dict
+        parent_key (str, optional): parent key for recursion. Defaults to "".
+        filter_ (Iterable[str] | None, optional): keys to filter from the input config. Defaults to None.
+        use_parent_key_for_filter (bool, optional): skips last node in the keys. Defaults to False.
+
+    Returns:
+        Dict[str, Any]: flattened config dict
+    """
+    items = {}
+
+    for key, value in config_dict.items():
+        full_key = f"{parent_key}.{key}" if parent_key else key
+
+        if isinstance(value, OmegaConfigDict) or isinstance(value, dict):
+            items.update(flatten(value, full_key, filter_, use_parent_key_for_filter))
+        else:
+            if filter_ is None:
+                items[full_key] = value
+            else: 
+                if key in filter_:
+                    if use_parent_key_for_filter:
+                        # Useful when we want to skip the last node for parsing `_doc_`s
+                        full_key = parent_key
+                    items[full_key] = value
+
+    return items

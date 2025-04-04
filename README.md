@@ -279,3 +279,45 @@ dump_config(cfg, "some_cfg.json")
 
 > [!warning]
 > Not all types in your config object might be serializable, especially if you're using custom classes. When loading a config using `omegaconf` adapter, we're ensuring that the output is serialized properly, with other config backends it might not be so pretty at the moment. If you're running into trouble my suggestion is to dump to a Pickle and use something like [objexplore](https://github.com/kylepollina/objexplore) to load the Pickle back again and explore the contents of the constructed config.
+
+### Config file documentation
+
+When designing a config file, you will often want to also document what each property means. Sadly enough, there aren't that many packages which handle config documentation very well. This is partially due to limitations of file formats used for configuration. For example YAML and TOML specifications do not cover parsing comments, meanwhile a lot of folks out there use comments to document parts of their config files:
+
+```yaml
+apple:
+  # Color of the apple
+  color: red
+  # Size of the apple
+  size: medium
+```
+
+We thought of implementing parsing for these but seriously, who would have time to build a reliable new parser for YAML or TOML which also processes comments correctly? Instead, it was much simpler to go with a separate documentation file. For the example above, you would create another file, e.g. `config.doc.yaml`:
+
+```yaml
+apple:
+  _doc_: properties of an apple
+  color:
+    _doc_: Color of the apple
+  size:
+    _doc_: Size of the apple
+```
+
+Then you can simply run:
+
+```bash
+confuk doc ./config.doc.yaml
+```
+
+This will display the documentation in the console, paged for your pleasure of reading. You have currently the following alternative options to display the contents of the documentation:
+
+- `confuk doc ./config.doc.yaml -f test.html` – as an HTML file (append `-o` to open it in the web browser right away)
+- `confuk doc ./config.doc.yaml -t` – in a tree view (might be more helpful for figuring out complex hierarchies)
+
+### Parsing configs on the command line
+
+Because sometimes you might want to display the cumulative config files after the imports and interpolations have been resolved, we added as an alternative to dumping to a file a command-line based print of the collected config:
+
+```bash
+confuk parse <path-to-config>
+```
