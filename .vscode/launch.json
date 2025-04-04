@@ -11,6 +11,17 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false
+        },
+        {
+            "name": "Parse with tree view",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "confuk.main",
+            "args": [
+                "parse", "test/test_interpolation.toml", "-t"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
         }
     ]
 }

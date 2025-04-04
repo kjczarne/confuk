@@ -1,0 +1,8 @@
+_doc_ = "lol"
+
+[something.subsomething]
+_doc_ = "Now this is something!"
+
+[something.subsomething_else]
+_doc_ = "Now this is something else!"
+
