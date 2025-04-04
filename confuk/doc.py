@@ -15,13 +15,14 @@ def extract_docs_from_file(config_path: Path):
     return extract_docs(cfg)
 
 
-def generate_html(docs, output_file):
+def generate_html(docs, output_file, title="*"):
     """Generates an HTML file with collapsible sections"""
-    html_content = """
+    html_content = f"""
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Configuration Documentation</title>
+        <title>{title}</title>
+    """ + """
         <style>
             body { font-family: Arial, sans-serif; }
             .section { margin-bottom: 10px; }
@@ -36,7 +37,8 @@ def generate_html(docs, output_file):
         </script>
     </head>
     <body>
-        <h1>Configuration Documentation</h1>
+    """ + f"""
+        <h1>{title}</h1>
     """
     for i, (key, desc) in enumerate(docs.items()):
         html_content += f'<div class="section">\n'

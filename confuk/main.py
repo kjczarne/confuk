@@ -34,7 +34,7 @@ def doc(doc_file: Path, tree: bool, file: Path | None, open_html: bool):
     docs = extract_docs_from_file(doc_file)
     display_in_console(docs, tree, md=True)
     if file is not None:
-        generate_html(docs, file)
+        generate_html(docs, file, title=doc_file.stem)
         if open_html:
             open_in_browser(file)
 
