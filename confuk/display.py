@@ -58,6 +58,8 @@ def display_markdown_tree(objs):
 
     def insert_nested(d, keys, value):
         for key in keys[:-1]:
+            if not isinstance(d.get(key), dict):
+                d[key] = get_nested_dict()
             d = d[key]
         d[keys[-1]] = value
 
