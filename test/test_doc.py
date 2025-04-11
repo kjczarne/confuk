@@ -22,7 +22,7 @@ class TestDocGeneration(unittest.TestCase):
     def test_doc_extraction(self):
         cfg = parse_config(self.path, "o")
         docs = extract_docs(cfg)
-        dct = {'': 'lol', 'something.subsomething': 'Now this is something!', 'something.subsomething_else': 'Now this is something else!'}
+        dct = {'': 'lol', 'something': 'lol', 'something.subsomething': 'Now this is something!', 'something.subsomething_else': 'Now this is something else!'}
         self.assertDictEqual(dct, docs)
         # display_in_console(docs, tree_view=True)
 

@@ -2,6 +2,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.tree import Tree
 from confuk.parse import flatten
+from collections import defaultdict
 
 
 def display_flat(objs):
@@ -51,23 +52,25 @@ def display_in_console(objs, tree_view=False, unpack: bool = False, md: bool = F
 
 
 def display_markdown_tree(objs):
-    """Displays configs/documentation as an indented Markdown trees"""
+    """Displays configs/documentation as an indented Markdown tree from flattened keys"""
+
     def get_nested_dict():
-        from collections import defaultdict
         return defaultdict(get_nested_dict)
 
-    def insert_nested(d, keys, value):
-        for key in keys[:-1]:
-            if not isinstance(d.get(key), dict):
-                d[key] = get_nested_dict()
-            d = d[key]
-        d[keys[-1]] = value
+    def insert_doc(d, keys, value):
+        for i, key in enumerate(keys):
+            if i == len(keys) - 1:
+                # Last key gets doc string
+                d = d[key]  # ensure the node exists
+                d["__doc__"] = value
+            else:
+                d = d[key]  # walk deeper
 
-    # Build nested dict structure
+    # Build nested dict structure with __doc__ fields
     nested = get_nested_dict()
     for key, desc in objs.items():
-        parts = key.split('.')
-        insert_nested(nested, parts, desc)
+        parts = key.split(".")
+        insert_doc(nested, parts, desc)
 
     # Recursively format Markdown
     def format_markdown(d, level=0):
@@ -75,10 +78,12 @@ def display_markdown_tree(objs):
         indent = "    " * level
         for k, v in d.items():
             if isinstance(v, dict):
-                md += f"{indent}- **{k}**\n"
-                md += format_markdown(v, level + 1)
-            else:
-                md += f"{indent}- **{k}**: {v}\n"
+                doc = v.get("__doc__")
+                md += f"{indent}- **{k}**"
+                if doc:
+                    md += f": {doc}"
+                md += "\n"
+                md += format_markdown({kk: vv for kk, vv in v.items() if kk != "__doc__"}, level + 1)
         return md
 
     console = Console()
