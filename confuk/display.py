@@ -51,8 +51,7 @@ def display_in_console(objs, tree_view=False, unpack: bool = False, md: bool = F
             display_flat(objs)
 
 
-def display_markdown_tree(objs):
-    """Displays configs/documentation as an indented Markdown tree from flattened keys"""
+def get_markdown_tree(objs):
 
     def get_nested_dict():
         return defaultdict(get_nested_dict)
@@ -86,7 +85,12 @@ def display_markdown_tree(objs):
                 md += format_markdown({kk: vv for kk, vv in v.items() if kk != "__doc__"}, level + 1)
         return md
 
+    return format_markdown(nested)
+
+
+def display_markdown_tree(objs):
+    """Displays configs/documentation as an indented Markdown tree from flattened keys"""
     console = Console()
-    markdown_output = format_markdown(nested)
+    markdown_output = get_markdown_tree(objs)
     console.pager()
     console.print(Markdown(markdown_output))

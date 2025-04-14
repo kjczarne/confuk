@@ -1,4 +1,5 @@
 import webbrowser
+import markdown as md_lib
 from omegaconf import OmegaConf, DictConfig as OmegaConfigDict
 from typing import *
 from pathlib import Path
@@ -48,6 +49,30 @@ def generate_html(docs, output_file, title="*"):
     html_content += "</body></html>"
     
     Path(output_file).write_text(html_content)
+
+
+def generate_html_from_markdown(md_text, output_file, title="Documentation"):
+    """Converts Markdown string to HTML and saves to file"""
+    html_body = md_lib.markdown(md_text)
+
+    html_full = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>{title}</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; }}
+        h1, h2, h3, h4 {{ color: #333; }}
+        ul {{ padding-left: 1.2em; }}
+        li {{ margin: 0.5em 0; }}
+    </style>
+</head>
+<body>
+    <h1>{title}</h1>
+    {html_body}
+</body>
+</html>"""
+
+    Path(output_file).write_text(html_full)
 
 
 def open_in_browser(output_file):
