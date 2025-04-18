@@ -29,13 +29,14 @@ def _repls_with_lr_delimiters(repls: Dict[str, Any], lr_delimiters: Tuple[str, s
 
 
 def _build_repl_dict_without_delimiters(config_file_path: Path) -> Dict[str, Any]:
+    resolved_cfg_file_path = config_file_path.resolve()
     return {
-        "$this_file": config_file_path,
-        "$this_dir": config_file_path.parent,
-        "$this_dirname": config_file_path.parent.name,
-        "$this_filename": config_file_path.name,
-        "$this_filename_stem": config_file_path.stem,
-        "$this_filename_suffix": config_file_path.suffix.replace(".", ""),
+        "$this_file": resolved_cfg_file_path,
+        "$this_dir": resolved_cfg_file_path.parent,
+        "$this_dirname": resolved_cfg_file_path.parent.name,
+        "$this_filename": resolved_cfg_file_path.name,
+        "$this_filename_stem": resolved_cfg_file_path.stem,
+        "$this_filename_suffix": resolved_cfg_file_path.suffix.replace(".", ""),
         "$cwd": Path.cwd()
     }
 
