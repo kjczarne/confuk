@@ -321,3 +321,15 @@ Because sometimes you might want to display the cumulative config files after th
 ```bash
 confuk parse <path-to-config>
 ```
+
+### Logging
+
+For more complex applications it's probably more useful to set up your own logging facilities the way you need them. For basic applications, you might use the `get_console_and_logger` function which accepts a simple logging config (which can be a part of your main config file):
+
+```yaml
+logging:
+  level: info
+  logfile: null
+```
+
+The function returns a `rich.console.Console` and a `logging.Logger` instance which are tied together and can be used througout your application.
