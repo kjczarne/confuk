@@ -223,6 +223,29 @@ If you like the deeply nested folder-file structure for your configs then [Hydra
 
 You are of course free to structure your files as you please but don't expect a feature similar to Hydra's `defaults` in `confuk` – I do indeed use Hydra for applications which require such a system!
 
+### Lambda-configs (templates)
+
+What if you want to reuse a portion of the config but parametrize on some variable? As an example imagine you want to have multiple variants in the config and want to reuse a YAML snippet in multiple places but with some variable changed:
+
+```yaml
+experiment: "exp_1"
+
+target_variants(crazy):
+  - name: "Inactive target"
+    id: "h1"
+    configurations:
+      - id: "HT"
+        pdb: "data/${experiment}/s_${crazy}tg1.pdb"
+
+variant_a: "${target_variants:awesome}"
+variant_b: "${target_variants:amazing}"
+```
+
+In `confuk` you can simply specify a parameter (`crazy` in the example above). Underneath this will automatically create an OmegaConf resolver that accepts the right number of inputs. So if you want to "call" this pseudo-function with `awesome` you would use `${target_variants:awesome}`.
+
+> [!note]
+> This is available starting with version `0.11.0` of `confuk`.
+
 ### Command-line overrides
 
 One of the most fantastic features I've found when using [Hydra](https://hydra.cc/) was the ability to override values from the config file on the command line. This is convenient when you want to quickly test some changes to your configuration without going through the trouble of creating a new config file.

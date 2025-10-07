@@ -1,0 +1,8 @@
+# Global variable that parameterized sections can access
+experiment = "experiment_1"
+variants = []
+variant_a = "${target_variants:awesome}"
+variant_b = "${target_variants:amazing}"
+
+['target_variants(crazy)']
+some_data = "${crazy}_data"

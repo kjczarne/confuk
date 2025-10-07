@@ -150,7 +150,15 @@ def _handle_variable_interpolation(config_dict: ConfigDict, config_path: Path):
     # existing solutions to old problems, except we need to
     # interpolate a couple of our own tags:
     config = _interpolate_special_variables(config_dict, config_path)
+
+    # Extract parameterized sections after imports are resolved:
+    parameterized = _extract_parameterized_sections(config)
+    # Register resolvers:
+    _register_parameterized_resolvers(parameterized)
+    # Resolve all interpolations
     config = OmegaConfigDict(config)
+    config = OmegaConf.create(config)
+    config = OmegaConf.to_container(config, resolve=False)
     config = OmegaConf.create(config)
     config = OmegaConf.to_container(config, resolve=True)
     return config
@@ -241,6 +249,108 @@ def _dict_to_omegaconfig(config_dict: ConfigDict) -> OmegaConfigDict:
 def _parse_omegaconfig(config_file_path: Path) -> OmegaConfigDict:
     config_dict = _parse_leaf_config_dict(config_file_path)
     return _dict_to_omegaconfig(config_dict)
+
+
+def _extract_parameterized_sections(config: Dict[str, Any]) -> Dict[str, tuple]:
+    """
+    Extract sections with parameters like 'section_name(param1, param2)'.
+    
+    Returns:
+        Dict mapping section names to (params, content) tuples
+    """
+    parameterized = {}
+    pattern = r'^(\w+)\(([\w\s,]+)\)$'
+    
+    keys_to_remove = []
+    for key in list(config.keys()):
+        match = re.match(pattern, key)
+        if match:
+            section_name = match.group(1)
+            params_str = match.group(2)
+            params = [p.strip() for p in params_str.split(',')]
+            
+            # Store the template
+            parameterized[section_name] = (params, config[key])
+            keys_to_remove.append(key)
+    
+    # Remove parameterized sections from original config
+    for key in keys_to_remove:
+        del config[key]
+    
+    return parameterized
+
+
+def _substitute_parameters_only(
+    obj: Any, 
+    param_bindings: Dict[str, str]
+) -> Any:
+    """
+    Recursively substitute ONLY the parameter variables, leaving global
+    interpolations intact for later resolution.
+    
+    Args:
+        obj: The object to process (dict, list, str, or primitive)
+        param_bindings: Mapping of parameter names to their values
+        
+    Returns:
+        Object with parameters substituted but global vars preserved
+    """
+    if isinstance(obj, dict):
+        return {
+            k: _substitute_parameters_only(v, param_bindings) 
+            for k, v in obj.items()
+        }
+    elif isinstance(obj, list):
+        return [
+            _substitute_parameters_only(item, param_bindings) 
+            for item in obj
+        ]
+    elif isinstance(obj, str):
+        # Only substitute parameters that are in param_bindings
+        # Leave other interpolations like ${order} untouched
+        result = obj
+        for param_name, param_value in param_bindings.items():
+            # Match ${param_name} specifically
+            pattern = r'\$\{' + re.escape(param_name) + r'\}'
+            result = re.sub(pattern, param_value, result)
+        return result
+    else:
+        # Primitives pass through unchanged
+        return obj
+
+
+def _register_parameterized_resolvers(
+    parameterized_sections: Dict[str, tuple]
+) -> None:
+    """
+    Register OmegaConf resolvers for each parameterized section.
+    These resolvers only substitute local parameters, leaving global
+    variable interpolations for later resolution.
+    """
+    
+    def create_resolver(params: List[str], template: Any):
+        def resolver(*args):
+            if len(args) != len(params):
+                raise ValueError(
+                    f"Expected {len(params)} arguments, got {len(args)}"
+                )
+            
+            # Create parameter bindings
+            param_bindings = {param: str(arg) for param, arg in zip(params, args)}
+            
+            # Substitute ONLY the parameters, leaving global vars as-is
+            result = _substitute_parameters_only(template, param_bindings)
+            
+            return result
+        
+        return resolver
+    
+    for section_name, (params, template) in parameterized_sections.items():
+        OmegaConf.register_new_resolver(
+            section_name,
+            create_resolver(params, template),
+            replace=True
+        )
 
 
 def parse_config(config_file_path_or_dict: Path | ConfigDict | str,

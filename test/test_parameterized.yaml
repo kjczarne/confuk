@@ -1,0 +1,20 @@
+experiment: experiment_1
+injected_data: hotspot_data_1
+variants: []
+
+target_variants(crazy):
+  - name: "Inactive target"
+    id: "h1"
+    configurations:
+      - id: "HT"
+        pdb: "data/${experiment}/s_${crazy}tg1.pdb"
+        data: "${injected_data}"
+
+build_path(experiment, crazy, target):
+  path: "data/${experiment}/s_${crazy}${target}.pdb"
+
+variant_a: "${target_variants:awesome}"
+variant_b: "${target_variants:amazing}"
+
+custom_path_a: "${build_path:exp1,awesome,tg1}"
+custom_path_b: "${build_path:exp2,amazing,tg2}"
