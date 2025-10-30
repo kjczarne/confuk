@@ -102,7 +102,7 @@ def _handle_pre_or_postamble(which: Literal["pre", "post"], config_dict: ConfigD
             # is built up, hence `skip_variable_interpolation=True`
             cfg_dict_from_imports = _handle_imports(imports_, True if which == "post" else False)
             # Override values from imports with those from the `config_dict`:
-            cfg_dict_from_imports = _recursive_dict_update(cfg_dict_from_imports, config_dict)
+            cfg_dict_from_imports = _recursive_dict_update(cfg_dict_from_imports, config_dict) if which == "pre" else _recursive_dict_update(config_dict, cfg_dict_from_imports)
             return cfg_dict_from_imports
         return config_dict
     return config_dict
