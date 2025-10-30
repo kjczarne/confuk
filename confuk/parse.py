@@ -72,10 +72,10 @@ def _handle_import_path(config_file_path_path: Path, import_path: Path | str) ->
     return Path(import_path)
 
 
-def _handle_imports(imports_list: List[Path]) -> ConfigDict:
+def _handle_imports(imports_list: List[Path], skip_variable_interpolation: bool = False) -> ConfigDict:
     out = {}
     for import_ in imports_list:
-        import_dict = _parse_config_dict(import_)
+        import_dict = _parse_config_dict(import_, skip_variable_interpolation)
         out = _recursive_dict_update(out, import_dict)
     return out
 
@@ -89,16 +89,18 @@ def _recursive_dict_update(d: ConfigDict, u: ConfigDict) -> ConfigDict:
     return d
 
 
-def _handle_preamble(config_dict: ConfigDict, config_file_path: Path) -> ConfigDict:
-    if "pre" in config_dict.keys():
-        pre = config_dict["pre"]
+def _handle_pre_or_postamble(which: Literal["pre", "post"], config_dict: ConfigDict, config_file_path: Path) -> ConfigDict:
+    if which in config_dict.keys():
+        pre = config_dict[which]
         if "imports" in pre.keys():
             imports = pre["imports"]
             imports_ = []
             for value in imports:
                 imports_.append(_handle_import_path(config_file_path, value))
-            # At this point `imports` contains actual paths
-            cfg_dict_from_imports = _handle_imports(imports_)
+            # At this point `imports` contains actual paths. Note that
+            # in `post` we need to defer variable interpolation until the entire config
+            # is built up, hence `skip_variable_interpolation=True`
+            cfg_dict_from_imports = _handle_imports(imports_, True if which == "post" else False)
             # Override values from imports with those from the `config_dict`:
             cfg_dict_from_imports = _recursive_dict_update(cfg_dict_from_imports, config_dict)
             return cfg_dict_from_imports
@@ -106,10 +108,26 @@ def _handle_preamble(config_dict: ConfigDict, config_file_path: Path) -> ConfigD
     return config_dict
 
 
-def _remove_preamble(config_dict: ConfigDict) -> ConfigDict:
+def _remove_pre_or_postamble(which: Literal["pre", "post"], config_dict: ConfigDict) -> ConfigDict:
     if "pre" in config_dict.keys():
         del config_dict["pre"]
     return config_dict
+
+
+def _handle_preamble(config_dict: ConfigDict, config_file_path: Path) -> ConfigDict:
+    return _handle_pre_or_postamble("pre", config_dict, config_file_path)
+
+
+def _remove_preamble(config_dict: ConfigDict) -> ConfigDict:
+    return _remove_pre_or_postamble("pre", config_dict)
+
+
+def _handle_postamble(config_dict: ConfigDict, config_file_path: Path) -> ConfigDict:
+    return _handle_pre_or_postamble("post", config_dict, config_file_path)
+
+
+def _remove_postamble(config_dict: ConfigDict) -> ConfigDict:
+    return _remove_pre_or_postamble("post", config_dict)
 
 
 # def replacer(config_dict: ConfigDict, old_value: Any, new_value: Any):
@@ -143,7 +161,8 @@ def _interpolate_special_variables(config_dict: ConfigDict,
     return config_dict_
 
 
-def _handle_variable_interpolation(config_dict: ConfigDict, config_path: Path):
+def _handle_variable_interpolation(config_dict: ConfigDict,
+                                   config_path: Path):
     # Lazy, but we borrow this from `omegaconf`, which is
     # the most brilliant package for configuration and
     # we support it as an output, so might as well use
@@ -153,12 +172,16 @@ def _handle_variable_interpolation(config_dict: ConfigDict, config_path: Path):
 
     # Extract parameterized sections after imports are resolved:
     parameterized = _extract_parameterized_sections(config)
-    # Register resolvers:
-    _register_parameterized_resolvers(parameterized)
-    # Resolve all interpolations
+    
+    # Dict to config instance:
     config = OmegaConfigDict(config)
     config = OmegaConf.create(config)
     config = OmegaConf.to_container(config, resolve=False)
+
+    # Register resolvers:
+    _register_parameterized_resolvers(parameterized)
+
+    # Resolve all interpolations
     config = OmegaConf.create(config)
     config = OmegaConf.to_container(config, resolve=True)
     return config
@@ -189,7 +212,7 @@ def _parse_json(config_file_path: Path) -> ConfigDict:
     return cfg
 
 
-def _parse_config_dict(config_file_path: Path) -> ConfigDict:
+def _parse_config_dict(config_file_path: Path, skip_variable_interpolation: bool = False) -> ConfigDict:
 
     match config_file_path.suffix.lower():
         case ".toml":
@@ -205,13 +228,22 @@ def _parse_config_dict(config_file_path: Path) -> ConfigDict:
 
     config_dict = _handle_preamble(config_dict, config_file_path)
     config_dict = _remove_preamble(config_dict)
-    config_dict = _handle_variable_interpolation(config_dict, config_file_path)
+    if not skip_variable_interpolation:
+        config_dict = _handle_variable_interpolation(config_dict, config_file_path)
+    config_dict = _handle_postamble(config_dict, config_file_path)
+    config_dict = _remove_postamble(config_dict)
+    # config_dict = _handle_variable_interpolation(config_dict, config_file_path)
     return config_dict
 
 
 def _parse_leaf_config_dict(config_file_path: Path) -> ConfigDict:
     config_dict = _parse_config_dict(config_file_path)
+    # This interpolates deferred imports and deferred varialbes
+    # when we reach the leaf node in the import stack:
     config_dict = _handle_leaf_node_interpolation(config_dict, config_file_path)
+    # After the `post` pass, some of the deferred-value variables will
+    # not yet be interpolated so we do another pass of `_handle_variable_interpolation`:
+    config_dict = _handle_variable_interpolation(config_dict, config_file_path)
     return config_dict
 
 

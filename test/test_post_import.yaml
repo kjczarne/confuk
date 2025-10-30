@@ -1,0 +1,5 @@
+deferred: "lol"
+
+post:
+  imports:
+    - "${this_dir}/test_post_imported.yaml"

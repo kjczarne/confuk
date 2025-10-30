@@ -246,6 +246,27 @@ In `confuk` you can simply specify a parameter (`crazy` in the example above). U
 > [!note]
 > This is available starting with version `0.11.0` of `confuk`.
 
+### Post-loading imports
+
+Sometimes you might want to use an imported config which has some particular key interpolated from the file that actually imports it. For example assume `test_post_imported.yaml` looks like this:
+
+```yaml
+some_key: "${deferred}"
+```
+
+Then you can use it like so:
+
+```yaml
+deferred: "lol"
+
+post:
+  imports:
+    - "${this_dir}/test_post_imported.yaml"
+
+```
+
+When loaded in the `post` section, the `${deferred}` key will be interpolated in the imported config _after_ the config which is the leaf node in the import graph. This way `some_key` will have the value of `"lol"` in the example.
+
 ### Command-line overrides
 
 One of the most fantastic features I've found when using [Hydra](https://hydra.cc/) was the ability to override values from the config file on the command line. This is convenient when you want to quickly test some changes to your configuration without going through the trouble of creating a new config file.
