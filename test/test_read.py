@@ -14,11 +14,12 @@ class TestRead(unittest.TestCase):
         cls.string_path = str(cls.path)
         cls.path_json = Path(__file__).parent / "test.json"
         cls.path_yaml = Path(__file__).parent / "test.yaml"
+        cls.path_python = Path(__file__).parent / "python_config.py"
         cls.dct = {'my': {'mother': 1}, 'your': {'dad': {'father': 1}}}
 
     def _make_test_configs(self, args: Tuple[str]):
         configs = []
-        for path in (self.path, self.string_path, self.path_json, self.path_yaml):
+        for path in (self.path, self.string_path, self.path_json, self.path_yaml, self.path_python):
             for arg in args:
                 cfg = parse_config(path, arg)
                 configs.append(cfg)

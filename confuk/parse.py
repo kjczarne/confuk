@@ -1,6 +1,7 @@
 import re
 import toml
 import json
+import importlib.util
 from typing import *
 from inspect import signature
 from pydantic import BaseModel
@@ -212,6 +213,19 @@ def _parse_json(config_file_path: Path) -> ConfigDict:
     return cfg
 
 
+def _parse_python(path: Path) -> ConfigDict:
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    if spec is None:
+        raise ValueError(f"Config {path} could not be imported! Module spec was `None`")
+    config_module = importlib.util.module_from_spec(spec)
+    if spec.loader is None:
+        raise ValueError(f"Config {path} could not be imported! Spec loader was `None`")
+    spec.loader.exec_module(config_module)
+    if not hasattr(config_module, "Config"):
+        raise TypeError(f"Config module {path} does not have a `config` dictionary. You must declare a `config` variable as a dictionary!")
+    return getattr(config_module, "config")
+
+
 def _parse_config_dict(config_file_path: Path, skip_variable_interpolation: bool = False) -> ConfigDict:
 
     match config_file_path.suffix.lower():
@@ -221,6 +235,8 @@ def _parse_config_dict(config_file_path: Path, skip_variable_interpolation: bool
             config_dict = _parse_yaml(config_file_path)
         case ".json":
             config_dict = _parse_json(config_file_path)
+        case ".py":
+            config_dict = _parse_python(config_file_path)
         case _:
             if not config_file_path.exists():
                 raise ValueError(f"{config_file_path} does not exist")

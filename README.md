@@ -84,7 +84,21 @@ class Metrics(BaseModel):
 cfg_dict = parse_config(Path("some.toml"), Metrics)  # returns a dictionary
 ```
 
-#### All currently supported formats
+#### Supported input file formats
+
+Currently we support the following input formats:
+
+- Declarative config formats:
+
+  - `.toml`
+  - `.yaml`
+  - `.json`
+
+- Procedural config formats:
+
+  - `.py` – a dictionary variable named `config` is required in the Python file to be loaded as a config instance.
+
+#### Supported output formats
 
 | Format      | `cfg_class` argument                               |
 | ----------- | -------------------------------------------------- |
