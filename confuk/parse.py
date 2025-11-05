@@ -76,7 +76,7 @@ def _handle_import_path(config_file_path_path: Path, import_path: Path | str) ->
 def _handle_imports(imports_list: List[Path], skip_variable_interpolation: bool = False) -> ConfigDict:
     out = {}
     for import_ in imports_list:
-        import_dict = _parse_config_dict(import_, skip_variable_interpolation)
+        import_dict, _ = _parse_config_dict(import_, skip_variable_interpolation)
         out = _recursive_dict_update(out, import_dict)
     return out
 
@@ -213,7 +213,7 @@ def _parse_json(config_file_path: Path) -> ConfigDict:
     return cfg
 
 
-def _parse_python(path: Path) -> ConfigDict:
+def _parse_python(path: Path) -> tuple[ConfigDict, Callable[[ConfigDict], None] | None]:
     spec = importlib.util.spec_from_file_location(path.stem, path)
     if spec is None:
         raise ValueError(f"Config {path} could not be imported! Module spec was `None`")
@@ -221,22 +221,24 @@ def _parse_python(path: Path) -> ConfigDict:
     if spec.loader is None:
         raise ValueError(f"Config {path} could not be imported! Spec loader was `None`")
     spec.loader.exec_module(config_module)
-    if not hasattr(config_module, "Config"):
+    if not hasattr(config_module, "config"):
         raise TypeError(f"Config module {path} does not have a `config` dictionary. You must declare a `config` variable as a dictionary!")
-    return getattr(config_module, "config")
+    cfg_obj = getattr(config_module, "config")
+    post_fn = getattr(config_module, "post", None)
+    return cfg_obj, post_fn
 
 
 def _parse_config_dict(config_file_path: Path, skip_variable_interpolation: bool = False) -> ConfigDict:
 
     match config_file_path.suffix.lower():
         case ".toml":
-            config_dict = _parse_toml(config_file_path)
+            config_dict, post_fn = _parse_toml(config_file_path), None
         case ".yaml":
-            config_dict = _parse_yaml(config_file_path)
+            config_dict, post_fn = _parse_yaml(config_file_path), None
         case ".json":
-            config_dict = _parse_json(config_file_path)
+            config_dict, post_fn = _parse_json(config_file_path), None
         case ".py":
-            config_dict = _parse_python(config_file_path)
+            config_dict, post_fn = _parse_python(config_file_path)
         case _:
             if not config_file_path.exists():
                 raise ValueError(f"{config_file_path} does not exist")
@@ -249,17 +251,19 @@ def _parse_config_dict(config_file_path: Path, skip_variable_interpolation: bool
     config_dict = _handle_postamble(config_dict, config_file_path)
     config_dict = _remove_postamble(config_dict)
     # config_dict = _handle_variable_interpolation(config_dict, config_file_path)
-    return config_dict
+    return config_dict, post_fn
 
 
 def _parse_leaf_config_dict(config_file_path: Path) -> ConfigDict:
-    config_dict = _parse_config_dict(config_file_path)
+    config_dict, post_fn = _parse_config_dict(config_file_path)
     # This interpolates deferred imports and deferred varialbes
     # when we reach the leaf node in the import stack:
     config_dict = _handle_leaf_node_interpolation(config_dict, config_file_path)
     # After the `post` pass, some of the deferred-value variables will
     # not yet be interpolated so we do another pass of `_handle_variable_interpolation`:
     config_dict = _handle_variable_interpolation(config_dict, config_file_path)
+    if post_fn is not None:
+        post_fn(config_dict)
     return config_dict
 
 
