@@ -1,9 +1,10 @@
 import webbrowser
-import markdown as md_lib
+import mistune
 from omegaconf import OmegaConf, DictConfig as OmegaConfigDict
 from typing import *
 from pathlib import Path
 from confuk.parse import flatten, parse_config
+from confuk.display import get_markdown_tree
 
 
 def extract_docs(config_dict: OmegaConfigDict):
@@ -16,54 +17,84 @@ def extract_docs_from_file(config_path: Path):
     return extract_docs(cfg)
 
 
-def generate_html(docs, output_file, title="*"):
-    """Generates an HTML file with collapsible sections"""
-    html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>{title}</title>
-    """ + """
-        <style>
-            body { font-family: Arial, sans-serif; }
-            .section { margin-bottom: 10px; }
-            .header { font-weight: bold; cursor: pointer; color: blue; }
-            .content { display: none; padding-left: 10px; }
-        </style>
-        <script>
-            function toggleVisibility(id) {
-                var content = document.getElementById(id);
-                content.style.display = (content.style.display === 'block') ? 'none' : 'block';
-            }
-        </script>
-    </head>
-    <body>
-    """ + f"""
-        <h1>{title}</h1>
-    """
-    for i, (key, desc) in enumerate(docs.items()):
-        html_content += f'<div class="section">\n'
-        html_content += f'  <div class="header" onclick="toggleVisibility(\'section{i}\')">{key}</div>\n'
-        html_content += f'  <div id="section{i}" class="content">{desc}</div>\n'
-        html_content += f'</div>'
-    html_content += "</body></html>"
+def generate_html(docs, output_file, title="Documentation"):
+    """Generates an HTML file from documentation using Markdown as intermediate format"""
+    # Convert docs to markdown tree
+    md_text = get_markdown_tree(docs)
     
-    Path(output_file).write_text(html_content)
+    # Convert markdown to HTML
+    generate_html_from_markdown(md_text, output_file, title)
 
 
 def generate_html_from_markdown(md_text, output_file, title="Documentation"):
     """Converts Markdown string to HTML and saves to file"""
-    html_body = md_lib.markdown(md_text)
+    
+    # mistune v3 (latest) has excellent nested structure handling
+    html_body = mistune.html(md_text)
 
     html_full = f"""<!DOCTYPE html>
 <html>
 <head>
     <title>{title}</title>
+    <meta charset="UTF-8">
     <style>
-        body {{ font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; }}
-        h1, h2, h3, h4 {{ color: #333; }}
-        ul {{ padding-left: 1.2em; }}
-        li {{ margin: 0.5em 0; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            max-width: 900px;
+            margin: auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }}
+        h1 {{
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 0.5em;
+        }}
+        h2, h3, h4 {{
+            color: #34495e;
+            margin-top: 1.5em;
+        }}
+        ul, ol {{
+            padding-left: 1.5em;
+        }}
+        li {{
+            margin: 0.5em 0;
+        }}
+        code {{
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9em;
+        }}
+        pre {{
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 12px;
+            overflow-x: auto;
+            margin: 1em 0;
+        }}
+        pre code {{
+            background-color: transparent;
+            padding: 0;
+        }}
+        blockquote {{
+            border-left: 4px solid #3498db;
+            margin: 1em 0;
+            padding-left: 1em;
+            color: #555;
+            font-style: italic;
+        }}
+        strong {{
+            color: #2c3e50;
+        }}
+        /* Ensure nested lists maintain proper indentation */
+        ul ul, ol ul, ul ol, ol ol {{
+            margin-top: 0.5em;
+            margin-bottom: 0.5em;
+        }}
     </style>
 </head>
 <body>

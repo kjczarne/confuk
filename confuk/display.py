@@ -74,7 +74,8 @@ def get_markdown_tree(objs):
     # Recursively format Markdown
     def format_markdown(d, level=0):
         md = ""
-        indent = "    " * level
+        # Use 2 spaces per level for proper markdown list nesting
+        indent = "  " * level
         for k, v in d.items():
             if isinstance(v, dict):
                 doc = v.get("__doc__")
@@ -85,8 +86,8 @@ def get_markdown_tree(objs):
                     if doc_lines:
                         # First line goes on same line as the key
                         md += f": {doc_lines[0]}"
-                        # Subsequent lines need to be indented to align with list content
-                        # List content indent = base indent + 2 spaces (for "- ")
+                        # Subsequent lines need 2 spaces relative to the bullet
+                        # This keeps them as part of the list item without triggering code blocks
                         content_indent = indent + "  "
                         for line in doc_lines[1:]:
                             md += f"\n{content_indent}{line}"
