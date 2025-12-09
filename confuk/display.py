@@ -80,7 +80,16 @@ def get_markdown_tree(objs):
                 doc = v.get("__doc__")
                 md += f"{indent}- **{k}**"
                 if doc:
-                    md += f": {doc}"
+                    # Split doc into lines and indent all lines after the first
+                    doc_lines = doc.split('\n')
+                    if doc_lines:
+                        # First line goes on same line as the key
+                        md += f": {doc_lines[0]}"
+                        # Subsequent lines need to be indented to align with list content
+                        # List content indent = base indent + 2 spaces (for "- ")
+                        content_indent = indent + "  "
+                        for line in doc_lines[1:]:
+                            md += f"\n{content_indent}{line}"
                 md += "\n"
                 md += format_markdown({kk: vv for kk, vv in v.items() if kk != "__doc__"}, level + 1)
         return md

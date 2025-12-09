@@ -1,0 +1,26 @@
+some_node:
+  _doc_: |
+    This node is documented with a multiline string.
+
+    Expected rendering for code blocks and stuff:
+
+    ```bash
+    ls -la
+    ```
+  subnode:
+    _doc_: "Some subnode"
+    subsubnode:
+      _doc_: |
+        Another node with structured documentation.
+
+        ```bash
+        echo "Nice!"
+        ```
+
+        We expect lists to also render nicely:
+
+          - As if you were
+          - writing a basic
+          - Markdown document
+        
+        > Why not throw in a blockquote
