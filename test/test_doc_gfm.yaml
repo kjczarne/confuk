@@ -1,0 +1,29 @@
+some_node:
+  _doc_: |
+    
+    > [!NOTE]
+    >
+    > asdfasdf
+    >
+
+  subnode:
+    _doc_: "Some subnode"
+    subsubnode:
+      _doc_: |
+        Do we support Mermaid?
+
+        ```mermaid
+        graph LR;
+        I --> think --> we --> do
+        ```
+    subsub2node:
+      _doc_: |
+        What about callouts?
+
+        > [!NOTE]
+        > Hell yeah!
+
+        And task lists:
+
+        - [ ] Do one
+        - [ ] Do two

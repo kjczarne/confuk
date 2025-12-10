@@ -22,6 +22,17 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": false
+        },
+        {
+            "name": "Docs",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "confuk.main",
+            "args": [
+                "doc", "test/test_doc_gfm.yaml", "-f", "test.html"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
         }
     ]
 }
