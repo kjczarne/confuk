@@ -213,7 +213,7 @@ def _parse_json(config_file_path: Path) -> ConfigDict:
     return cfg
 
 
-def _parse_python(path: Path) -> tuple[ConfigDict, Callable[[ConfigDict], None] | None]:
+def import_arbitrary_python_file(path: Path):
     spec = importlib.util.spec_from_file_location(path.stem, path)
     if spec is None:
         raise ValueError(f"Config {path} could not be imported! Module spec was `None`")
@@ -221,6 +221,11 @@ def _parse_python(path: Path) -> tuple[ConfigDict, Callable[[ConfigDict], None] 
     if spec.loader is None:
         raise ValueError(f"Config {path} could not be imported! Spec loader was `None`")
     spec.loader.exec_module(config_module)
+    return config_module
+
+
+def _parse_python(path: Path) -> tuple[ConfigDict, Callable[[ConfigDict], None] | None]:
+    config_module = import_arbitrary_python_file(path)
     if not hasattr(config_module, "config"):
         raise TypeError(f"Config module {path} does not have a `config` dictionary. You must declare a `config` variable as a dictionary!")
     cfg_obj = getattr(config_module, "config")
