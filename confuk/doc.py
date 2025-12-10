@@ -132,7 +132,6 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
         ]
     )
     
-    md_text = "> [!NOTE]\n> \n> asdfasdf\n" + md_text
     html_body = markdown(md_text)
 
     html_full = f"""<!DOCTYPE html>
