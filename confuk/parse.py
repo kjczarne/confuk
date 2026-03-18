@@ -457,7 +457,14 @@ def parse_config(config_file_path_or_dict: Path | ConfigDict | str,
                     case _:
                         raise TypeError(f"Function {parse_fn.__name__} has {num_params_for_parse_fn}, this type of signature is unsupported.")
             case dict(config_file_path_or_dict):
-                return dict_fn(config_file_path_or_dict)
+                num_params_for_dict_fn = len(signature(dict_fn).parameters)
+                match num_params_for_dict_fn :
+                    case 2:
+                        return dict_fn(config_file_path_or_dict, cfg_class)
+                    case 1:
+                        return dict_fn(config_file_path_or_dict)
+                    case _:
+                        raise TypeError(f"Function {dict_fn.__name__} has {num_params_for_dict_fn }, this type of signature is unsupported.")
 
     match cfg_class:
         case None | "dict" | "d":
