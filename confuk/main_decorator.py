@@ -121,6 +121,46 @@ def main(config: Path | str,
     return main_decorator
 
 
+def click_option(*args, cfg_path: str | None = None, **kwargs):
+    """
+    Drop-in replacement for ``@click.option`` that accepts an optional ``cfg_path`` argument.
+
+    ``cfg_path`` is a dot-separated config key specifying which config property this
+    option should override when used with ``@confuk.click_main``. Without ``cfg_path``,
+    the option's own name is used as the config key (matching the default behaviour).
+
+    Example::
+
+        @confuk.click_main("config.yaml", MyConfig)
+        @click.command()
+        @confuk.click_option('--data', cfg_path="data.path")
+        @confuk.click_option('--lr', type=float, cfg_path="training.lr")
+        def my_main(cfg, data, lr):
+            ...
+    """
+    try:
+        import click
+    except ImportError:
+        raise ImportError(
+            "click must be installed to use confuk.click_option(). "
+            "Install it with: pip install click"
+        )
+
+    standard_decorator = click.option(*args, **kwargs)
+
+    if cfg_path is None:
+        return standard_decorator
+
+    def decorator(func):
+        result = standard_decorator(func)
+        # click prepends each new option to __click_params__, so index 0 is the
+        # most recently added — i.e. the one we just created above.
+        result.__click_params__[0]._confuk_cfg_path = cfg_path
+        return result
+
+    return decorator
+
+
 def click_main(config: Path | str,
                config_format: SupportedConfigFormat,
                verbose=False):
@@ -131,15 +171,18 @@ def click_main(config: Path | str,
 
         @confuk.click_main("config.yaml", MyConfig)
         @click.command()
-        @click.option('--lr', type=float, default=None)
-        def my_main(cfg, lr):
+        @confuk.click_option('--data', cfg_path="data.path")  # nested key override
+        @click.option('--lr', type=float, default=None)       # top-level key override
+        def my_main(cfg, data, lr):
             ...
 
-    - `-c`/`--config` are added to the click command and reserved for config loading.
-    - Any click option whose name matches a key in the config will override that key
-      when a value is explicitly provided on the command line.
-    - The original callback is called as `original_callback(cfg, **kwargs)` where
-      `kwargs` contains all click options (excluding `config`).
+    - ``-c``/``--config`` are added to the click command and reserved for config loading.
+    - Options decorated with ``@confuk.click_option(..., cfg_path=...)`` override the
+      specified dot-separated config key.
+    - Options decorated with plain ``@click.option`` override the config key matching
+      the option name, if such a key exists in the config.
+    - The original callback is called as ``original_callback(cfg, **kwargs)`` where
+      ``kwargs`` contains all click options (excluding ``config``).
     """
     try:
         import click
@@ -160,6 +203,13 @@ def click_main(config: Path | str,
                     "Please remove these from your click command before using confuk.click_main()."
                 )
 
+        # Build a mapping: click param name -> config dot-path (from cfg_path metadata)
+        cfg_path_map: dict[str, str] = {
+            param.name: param._confuk_cfg_path
+            for param in click_cmd.params
+            if hasattr(param, '_confuk_cfg_path')
+        }
+
         # Inject the --config option at the front so it appears first in --help
         click_cmd.params.insert(0, click.Option(
             ('-c', '--config'),
@@ -172,7 +222,11 @@ def click_main(config: Path | str,
         @functools.wraps(original_callback)
         def new_callback(**kwargs):
             config_ = kwargs.pop('config', None) or config
-            named_overrides = {k: v for k, v in kwargs.items() if v is not None}
+            named_overrides = {
+                cfg_path_map.get(k, k): v
+                for k, v in kwargs.items()
+                if v is not None
+            }
             cfg = _load_and_override_config(config_, config_format, named_overrides, (), verbose, console)
             return original_callback(cfg, **kwargs)
 

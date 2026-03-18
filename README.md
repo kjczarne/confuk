@@ -329,6 +329,18 @@ def my_main(cfg, lr):
 
 ```
 
+If you want your CLI to override specific lower-level values in the config, you can leverage a drop-in `click_option` decorator with the `cfg_path` argument:
+
+```python
+@confuk.click_main("config.yaml", MyConfig)
+@click.command()
+@confuk.click_option('--data', cfg_path="data.path")        # overrides cfg.data.path
+@confuk.click_option('--lr', type=float, cfg_path="training.lr")  # overrides cfg.training.lr
+@click.option('--epochs', type=int, default=None)           # overrides cfg.epochs (by name)
+def my_main(cfg, data, lr, epochs):
+    ...
+```
+
 ### Dumping configs
 
 This is mostly for debugging purposes.
