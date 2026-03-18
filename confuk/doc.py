@@ -5,7 +5,7 @@ from typing import *
 from pathlib import Path
 from confuk.parse import flatten, parse_config
 from confuk.display import get_markdown_tree
-
+import re
 
 def extract_docs(config_dict: OmegaConfigDict):
     """Extracts documentation comments from a config/docconfig object"""
@@ -21,46 +21,57 @@ def generate_html(docs, output_file, title="Documentation"):
     """Generates an HTML file from documentation using Markdown as intermediate format"""
     # Convert docs to markdown tree
     md_text = get_markdown_tree(docs)
-    
     # Convert markdown to HTML
     generate_html_from_markdown(md_text, output_file, title)
 
 
 def generate_html_from_markdown(md_text, output_file, title="Documentation"):
-    """Converts Markdown string to HTML and saves to file with GFM and Mermaid support"""
-    import mistune
-    import re
-    
-    # Custom renderer to handle Mermaid code blocks
+    """
+    Converts Markdown string to HTML and saves to file with:
+      - GFM-style callouts (> [!NOTE])
+      - Mermaid code block handling
+      - A structural TOC collected during block parsing (Option A: TOC before body)
+    """
+    # -----------------------------
+    # Custom renderer
+    # -----------------------------
     class MermaidRenderer(mistune.HTMLRenderer):
+        def __init__(self):
+            super().__init__()
+            # The renderer does not collect TOC in this implementation;
+            # plugin_toc_tree (below) will attach toc to the Markdown instance.
+            # Keep renderer light and focused on HTML rendering.
+            self.list_depth = 0
+
         def block_code(self, code, info=None):
-            """Override block_code to handle mermaid blocks specially"""
+            """Handle mermaid code blocks specially"""
             if info and info.strip().lower() == 'mermaid':
-                # Render as a div with mermaid class for rendering
-                return f'<div class="mermaid">\n{code}\n</div>\n'
+                return f'<div class="mermaid">\n{mistune.escape(code)}\n</div>\n'
             else:
-                # Regular code block
                 if info:
                     return f'<pre><code class="language-{mistune.escape(info)}">{mistune.escape(code)}</code></pre>\n'
                 return f'<pre><code>{mistune.escape(code)}</code></pre>\n'
-    
+
+        # Keep list rendering standard; the plugin will collect structural TOC.
+        def list(self, text, ordered, **attrs):
+            if ordered:
+                return f'<ol>\n{text}</ol>\n'
+            else:
+                return f'<ul>\n{text}</ul>\n'
+
+        def list_item(self, text):
+            return f'<li>{text}</li>\n'
+
+    # -----------------------------
+    # Plugin: GFM-style callouts
+    # -----------------------------
     def plugin_gfm_alerts(md):
         """
-        GitHub-style callouts:
-        
-        > [!NOTE]
-        > message
-
-        Produces <div class="alert alert-note">...</div>
+        Detects GitHub-style callouts:
+          > [!NOTE]
+          > note text...
+        and produces a 'gfm_alert' token with children parsed locally.
         """
-        import re
-
-        # Matches patterns like:
-        #
-        # > [!NOTE]
-        # > Some text
-        # > More text
-        #
         ALERT_PATTERN = re.compile(
             r"""
             ^>[\ \t]*\[(?:!)(?P<type>NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*\n
@@ -72,11 +83,10 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
         def parse_alert(self, m, state):
             alert_type = m.group("type").upper()
             content = m.group("content")
-
-            # Strip leading "> " markers from content lines
+            # Remove leading ">" characters from each content line
             stripped = re.sub(r"^>\s?", "", content, flags=re.MULTILINE).strip()
 
-            # Parse child tokens using a fresh local state
+            # Parse child tokens using a fresh local state to avoid polluting global state
             child_state = state.copy()
             child_state.process(stripped)
             children = child_state.tokens
@@ -107,37 +117,155 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
                 f'</div>\n'
             )
 
-        # Register block rule BEFORE block_quote so it is evaluated first
-        md.block.register(
-            "gfm_alert",
-            ALERT_PATTERN,
-            parse_alert,
-            before="block_quote",
-        )
+        # Register block rule BEFORE block_quote so it is tested first
+        md.block.register("gfm_alert", ALERT_PATTERN, parse_alert, before="block_quote")
 
-        # Register renderer when appropriate
-        if md.renderer and md.renderer.NAME == "html":
+        # Register renderer hook if HTML renderer is present
+        if md.renderer and getattr(md.renderer, "NAME", "") == "html":
             md.renderer.register("gfm_alert", render_gfm_alert)
 
-    
-    # Create markdown renderer with custom renderer and GFM plugins
+    def plugin_toc_tree(md):
+        """
+        Collect hierarchical TOC items during rendering.
+        Tracks nesting by intercepting both list and list_item rendering.
+        """
+        if not hasattr(md, 'renderer') or not md.renderer:
+            return
+        
+        md.toc_items = []
+        
+        # Store original methods
+        original_list = md.renderer.list
+        original_list_item = md.renderer.list_item
+        
+        # Use a stack to track depth more accurately
+        depth_stack = [0]  # Start at depth 0
+        
+        def list_with_depth(text, ordered, **attrs):
+            """Track entering/exiting lists"""
+            # When we enter a list, we're going one level deeper
+            current_depth = depth_stack[-1] + 1
+            depth_stack.append(current_depth)
+            
+            result = original_list(text, ordered, **attrs)
+            
+            # Exit this list level
+            depth_stack.pop()
+            return result
+        
+        def list_item_with_toc(text):
+            """Collect TOC entries from list items with strong emphasis"""
+            # Look for strong tags in the text
+            strong_match = re.search(r'<strong>([^<]+)</strong>', text)
+            if strong_match:
+                key_name = strong_match.group(1).strip()
+                item_id = re.sub(r'[^a-zA-Z0-9_.-]', '-', key_name).strip('-').lower()
+                # Current depth is the last item in the stack minus 1 (0-indexed)
+                level = max(0, depth_stack[-1] - 1)
+                
+                md.toc_items.append({
+                    "id": item_id,
+                    "name": key_name,
+                    "level": level
+                })
+                
+                # Add id attribute to the list item
+                return f'<li id="{item_id}">{text}</li>\n'
+            
+            return original_list_item(text)
+        
+        # Replace renderer methods
+        md.renderer.list = list_with_depth
+        md.renderer.list_item = list_item_with_toc
+
+    # -----------------------------
+    # Markdown creation with plugins
+    # -----------------------------
+    renderer = MermaidRenderer()
+
     markdown = mistune.create_markdown(
-        renderer=MermaidRenderer(),
+        renderer=renderer,
         plugins=[
             "strikethrough",
             "table",
             "url",
             "task_lists",
-            plugin_gfm_alerts,     # GFM-style alerts
-        ]
+            plugin_gfm_alerts,
+            plugin_toc_tree,
+        ],
     )
-    
+
+    # -----------------------------
+    # Render markdown to HTML body
+    # -----------------------------
     html_body = markdown(md_text)
 
+    # -----------------------------
+    # Build nested TOC HTML from markdown.toc_items (collected by plugin_toc_tree)
+    # -----------------------------
+    def build_nested_toc(items):
+        """
+        Build a nested <ul> TOC from a list of items with 'level' (0-based).
+        Creates properly nested lists based on hierarchical levels.
+        """
+        if not items:
+            return ""
+
+        out = []
+        out.append('<div class="toc">\n<h2>Table of Contents</h2>\n')
+        
+        # Start with the first level
+        out.append('<ul>\n')
+        stack_depth = 0
+        
+        for it in items:
+            lvl = int(it.get("level", 0))
+            name = it.get("name", "")
+            item_id = it.get("id", "")
+
+            # Open deeper levels
+            while stack_depth < lvl:
+                out.append('<ul>\n')
+                stack_depth += 1
+
+            # Close levels
+            while stack_depth > lvl:
+                out.append('</ul>\n</li>\n')
+                stack_depth -= 1
+
+            # Add the list item
+            out.append(f'<li><a href="#{item_id}">{mistune.escape(name)}</a>')
+            
+            # Check if next item is deeper (will need to open a nested list)
+            # If so, don't close this <li> yet
+            # Otherwise, close it now
+            next_idx = items.index(it) + 1
+            if next_idx < len(items):
+                next_lvl = int(items[next_idx].get("level", 0))
+                if next_lvl <= lvl:
+                    out.append('</li>\n')
+            else:
+                out.append('</li>\n')
+
+        # Close remaining open lists
+        while stack_depth > 0:
+            out.append('</ul>\n</li>\n')
+            stack_depth -= 1
+        
+        out.append('</ul>\n')  # Close the initial <ul>
+        out.append('</div>\n')
+        return "".join(out)
+
+    toc_items = getattr(markdown, "toc_items", []) or []
+    toc_html = build_nested_toc(toc_items)
+
+    # -----------------------------
+    # Final HTML assembly
+    # -----------------------------
     html_full = f"""<!DOCTYPE html>
 <html>
 <head>
-    <title>{title}</title>
+    <title>{mistune.escape(title)}</title>
     <meta charset="UTF-8">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -145,7 +273,7 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
     <style>
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            max-width: 900px;
+            max-width: 1200px;
             margin: auto;
             padding: 20px;
             line-height: 1.6;
@@ -159,6 +287,63 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
         h2, h3, h4 {{
             color: #34495e;
             margin-top: 1.5em;
+        }}
+        /* Table of Contents styling */
+        .toc {{
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 1.5em;
+            margin: 2em 0;
+            position: sticky;
+            top: 20px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }}
+        .toc h2 {{
+            margin-top: 0;
+            margin-bottom: 1em;
+            font-size: 1.3em;
+            color: #2c3e50;
+        }}
+        .toc > ul {{
+            list-style: none;
+            padding-left: 0;
+            margin: 0;
+        }}
+        .toc ul {{
+            list-style: none;
+            padding-left: 0;
+            margin: 0.25em 0;
+        }}
+        .toc ul ul {{
+            padding-left: 1.5em;
+            margin-top: 0.25em;
+        }}
+        .toc li {{
+            margin: 0.4em 0;
+        }}
+        .toc a {{
+            color: #0969da;
+            text-decoration: none;
+            display: block;
+            padding: 0.2em 0;
+        }}
+        .toc a:hover {{
+            color: #0550ae;
+            text-decoration: underline;
+        }}
+        /* Content area */
+        .content {{
+            margin-top: 2em;
+        }}
+        :target {{
+            animation: highlight 2s ease;
+            scroll-margin-top: 20px;
+        }}
+        @keyframes highlight {{
+            0% {{ background-color: #fff3cd; }}
+            100% {{ background-color: transparent; }}
         }}
         ul, ol {{
             padding-left: 1.5em;
@@ -194,33 +379,6 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
         }}
         strong {{
             color: #2c3e50;
-        }}
-        /* Ensure nested lists maintain proper indentation */
-        ul ul, ol ul, ul ol, ol ol {{
-            margin-top: 0.5em;
-            margin-bottom: 0.5em;
-        }}
-        /* Table styling for GFM tables */
-        table {{
-            border-collapse: collapse;
-            width: 100%;
-            margin: 1em 0;
-        }}
-        th, td {{
-            border: 1px solid #ddd;
-            padding: 8px 12px;
-            text-align: left;
-        }}
-        th {{
-            background-color: #f8f8f8;
-            font-weight: bold;
-        }}
-        tr:nth-child(even) {{
-            background-color: #f9f9f9;
-        }}
-        /* Task list styling */
-        input[type="checkbox"] {{
-            margin-right: 0.5em;
         }}
         /* Mermaid diagram container */
         .mermaid {{
@@ -276,7 +434,15 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
             border-left-color: #d1242f;
             color: #86181d;
         }}
+        /* Responsive */
+        @media (max-width: 768px) {{
+            .toc {{
+                position: static;
+                max-height: none;
+            }}
+        }}
     </style>
+
     <!-- Mermaid.js for diagram rendering -->
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
@@ -288,12 +454,16 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
     </script>
 </head>
 <body>
-    <h1>{title}</h1>
-    {html_body}
+    <h1>{mistune.escape(title)}</h1>
+    {toc_html}
+    <div class="content">
+        {html_body}
+    </div>
 </body>
 </html>"""
 
     Path(output_file).write_text(html_full)
+
 
 def open_in_browser(output_file):
     """Opens the generated HTML file in the browser"""

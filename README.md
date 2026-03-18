@@ -315,6 +315,20 @@ And you run your CLI app with the argument `your.dad.father=3`, you will overrid
 > [!tip]
 > The underlying argument parser also contains a `--config` option. You can use it to switch to a different config path on the command line, without a need to rely on the default one that has been set in the decorator.
 
+#### Drop-in `click` argument parser overrides
+
+We also have a drop-in decorator for `click` which adds a `--config/-c` option to your command line interface and any argument you feed via the CLI will simply override the top-level config keys:
+
+```python
+@confuk.click_main("config.yaml", MyConfig)
+@click.command()
+@click.option('--lr', type=float, default=None)
+def my_main(cfg, lr):
+    # cfg loaded/overridden, lr passed through
+    ...
+
+```
+
 ### Dumping configs
 
 This is mostly for debugging purposes.
