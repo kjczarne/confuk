@@ -417,3 +417,103 @@ logging:
 ```
 
 The function returns a `rich.console.Console` and a `logging.Logger` instance which are tied together and can be used througout your application.
+
+### Populating dataclasses from OmegaConf configs
+
+When you parse a config into an `OmegaConf` `DictConfig` and want to hydrate a typed dataclass from it, `confuk` provides `from_config` so you never have to hand-write a constructor full of `OmegaConf.select(...)` calls:
+
+```python
+from dataclasses import dataclass
+from confuk import parse_config, from_config
+
+@dataclass
+class TrainConfig:
+    lr: float = 1e-3
+    epochs: int = 100
+    tag: str = "default"
+
+raw = parse_config("train.toml", "omega")   # DictConfig
+cfg = from_config(TrainConfig, raw)          # TrainConfig instance
+```
+
+The single rule: for every field of the dataclass, take the value from the config if it is present and not `???` (OmegaConf MISSING); otherwise leave it out of the constructor call so the dataclass's own default or `default_factory` applies. Required fields with no default that are absent from the config raise the normal `TypeError` from `__init__`.
+
+You can also pass a plain `dict` directly — `from_config` wraps it in `OmegaConf.create` automatically.
+
+#### Nested dataclasses
+
+Type annotations are respected, so nested dataclass fields are populated recursively:
+
+```python
+@dataclass
+class Optimizer:
+    name: str = "adam"
+    lr: float = 1e-3
+
+@dataclass
+class TrainConfig:
+    epochs: int = 100
+    optimizer: Optimizer = field(default_factory=Optimizer)
+```
+
+A config section like `[optimizer]` (TOML) or an `optimizer:` key (YAML) will be recursively converted to an `Optimizer` instance. The same applies to `list[SomeDataclass]` and `tuple[SomeDataclass, ...]` fields — each element in the list is converted individually.
+
+#### Keeping raw OmegaConf containers
+
+If you declare a field with type `DictConfig` or `ListConfig`, `from_config` passes the value through unchanged so you retain the full OmegaConf API on that sub-tree:
+
+```python
+from omegaconf import DictConfig
+from dataclasses import dataclass
+
+@dataclass
+class Cfg:
+    hyperparams: DictConfig   # stays as DictConfig, not converted
+```
+
+All other OmegaConf containers (e.g. a `dict`-like field typed as `Any`) are converted to native Python via `OmegaConf.to_container(resolve=True)`, including resolving any remaining interpolations.
+
+#### Strict mode
+
+By default, extra keys in the config that have no corresponding dataclass field are silently ignored. Pass `strict=True` to raise a `ValueError` instead:
+
+```python
+from_config(TrainConfig, raw, strict=True)
+# ValueError: Unknown config keys for TrainConfig: ['typo_key']
+```
+
+#### `ConfigMixin` — classmethod on the dataclass itself
+
+If you prefer calling `MyConfig.from_config(cfg)` rather than the standalone function, inherit from `ConfigMixin`:
+
+```python
+from dataclasses import dataclass
+from confuk import ConfigMixin
+
+@dataclass
+class TrainConfig(ConfigMixin):
+    lr: float = 1e-3
+    epochs: int = 100
+
+cfg = TrainConfig.from_config(raw)
+cfg = TrainConfig.from_config(raw, strict=True)
+```
+
+#### `@config_dataclass` — decorator without inheritance
+
+If you would rather avoid adding a base class (for example to avoid MRO issues, or to decorate a dataclass defined elsewhere), use the `config_dataclass` decorator instead:
+
+```python
+from dataclasses import dataclass
+from confuk import config_dataclass
+
+@config_dataclass
+@dataclass
+class TrainConfig:
+    lr: float = 1e-3
+    epochs: int = 100
+
+cfg = TrainConfig.from_config(raw)
+```
+
+Both `ConfigMixin` and `@config_dataclass` are thin wrappers over the same `from_config` function and accept the same arguments.

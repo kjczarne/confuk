@@ -3,3 +3,4 @@ from .dump import dump_config
 from .main_decorator import main, click_main, click_option
 from .doc import extract_docs, extract_docs_from_file
 from .logging import get_console_and_logger
+from .from_config import from_config, ConfigMixin, config_dataclass
