@@ -1,5 +1,6 @@
 import webbrowser
 import mistune
+from mistune.plugins.table import table_in_list
 from omegaconf import OmegaConf, DictConfig as OmegaConfigDict
 from typing import *
 from pathlib import Path
@@ -188,6 +189,7 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
         plugins=[
             "strikethrough",
             "table",
+            table_in_list,
             "url",
             "task_lists",
             plugin_gfm_alerts,
@@ -406,6 +408,24 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
         }}
         strong {{
             color: #2c3e50;
+        }}
+        table {{
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1em 0;
+        }}
+        th, td {{
+            border: 1px solid #dee2e6;
+            padding: 0.5em 0.8em;
+            text-align: left;
+        }}
+        th {{
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #2c3e50;
+        }}
+        tbody tr:nth-child(even) {{
+            background-color: #f8f9fa;
         }}
         /* Mermaid diagram container */
         .mermaid {{
