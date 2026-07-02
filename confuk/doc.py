@@ -212,8 +212,8 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
             return ""
 
         out = []
-        out.append('<div class="toc">\n<h2>Table of Contents</h2>\n')
-        
+        out.append('<nav class="toc">\n<details open>\n<summary>Table of Contents</summary>\n')
+
         # Start with the first level
         out.append('<ul>\n')
         stack_depth = 0
@@ -253,7 +253,7 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
             stack_depth -= 1
         
         out.append('</ul>\n')  # Close the initial <ul>
-        out.append('</div>\n')
+        out.append('</details>\n</nav>\n')
         return "".join(out)
 
     toc_items = getattr(markdown, "toc_items", []) or []
@@ -288,6 +288,16 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
             color: #34495e;
             margin-top: 1.5em;
         }}
+        /* Page layout: ToC sidebar + content column */
+        .page {{
+            display: grid;
+            grid-template-columns: 280px minmax(0, 1fr);
+            align-items: start;
+            gap: 2em;
+        }}
+        .page.no-toc {{
+            grid-template-columns: 1fr;
+        }}
         /* Table of Contents styling */
         .toc {{
             background-color: #f8f9fa;
@@ -297,14 +307,31 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
             margin: 2em 0;
             position: sticky;
             top: 20px;
-            max-height: 80vh;
+            max-height: calc(100vh - 40px);
             overflow-y: auto;
         }}
-        .toc h2 {{
-            margin-top: 0;
+        .toc summary {{
+            cursor: pointer;
             margin-bottom: 1em;
             font-size: 1.3em;
+            font-weight: bold;
             color: #2c3e50;
+            list-style: none;
+        }}
+        .toc summary::-webkit-details-marker {{
+            display: none;
+        }}
+        .toc summary::before {{
+            content: '▸';
+            display: inline-block;
+            margin-right: 0.4em;
+            transition: transform 0.15s ease;
+        }}
+        .toc details[open] summary::before {{
+            transform: rotate(90deg);
+        }}
+        .toc details[open] summary {{
+            margin-bottom: 1em;
         }}
         .toc > ul {{
             list-style: none;
@@ -435,10 +462,13 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
             color: #86181d;
         }}
         /* Responsive */
-        @media (max-width: 768px) {{
+        @media (max-width: 900px) {{
+            .page {{
+                grid-template-columns: 1fr;
+            }}
             .toc {{
                 position: static;
-                max-height: none;
+                max-height: 50vh;
             }}
         }}
     </style>
@@ -455,9 +485,11 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
 </head>
 <body>
     <h1>{mistune.escape(title)}</h1>
-    {toc_html}
-    <div class="content">
-        {html_body}
+    <div class="page{'' if toc_html else ' no-toc'}">
+        {toc_html}
+        <div class="content">
+            {html_body}
+        </div>
     </div>
 </body>
 </html>"""
