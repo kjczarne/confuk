@@ -127,57 +127,63 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
 
     def plugin_toc_tree(md):
         """
-        Collect hierarchical TOC items during rendering.
-        Tracks nesting by intercepting both list and list_item rendering.
+        Collect hierarchical TOC items from the parsed token tree (before
+        rendering), since mistune's HTML renderer builds list items
+        bottom-up (children before parents) which makes it unreliable for
+        reconstructing document-order nesting depth after the fact.
         """
+        def slugify(name):
+            return re.sub(r'[^a-zA-Z0-9_.-]', '-', name).strip('-').lower()
+
+        # before_render_hooks fire on the raw block-level token tree, before
+        # inline parsing turns each block_text's "text" into "children" -
+        # so the bold key name has to be pulled out of the raw markdown here.
+        name_pattern = re.compile(r'^\*\*(?P<name>[^*]+)\*\*')
+
+        def collect_toc(md, state):
+            toc_items = []
+
+            def walk(tokens):
+                for tok in tokens:
+                    if tok.get("type") != "list":
+                        continue
+                    depth = tok.get("attrs", {}).get("depth", 0)
+                    for item in tok.get("children", []):
+                        if item.get("type") != "list_item":
+                            continue
+                        name = None
+                        nested_lists = []
+                        for child in item.get("children", []):
+                            if child.get("type") == "block_text" and name is None:
+                                m = name_pattern.match(child.get("text", ""))
+                                if m:
+                                    name = m.group("name")
+                            elif child.get("type") == "list":
+                                nested_lists.append(child)
+                        if name:
+                            toc_items.append({"id": slugify(name), "name": name, "level": depth})
+                        walk(nested_lists)
+
+            walk(state.tokens)
+            md.toc_items = toc_items
+
+        md.before_render_hooks.append(collect_toc)
+
         if not hasattr(md, 'renderer') or not md.renderer:
             return
-        
-        md.toc_items = []
-        
-        # Store original methods
-        original_list = md.renderer.list
+
         original_list_item = md.renderer.list_item
-        
-        # Use a stack to track depth more accurately
-        depth_stack = [0]  # Start at depth 0
-        
-        def list_with_depth(text, ordered, **attrs):
-            """Track entering/exiting lists"""
-            # When we enter a list, we're going one level deeper
-            current_depth = depth_stack[-1] + 1
-            depth_stack.append(current_depth)
-            
-            result = original_list(text, ordered, **attrs)
-            
-            # Exit this list level
-            depth_stack.pop()
-            return result
-        
-        def list_item_with_toc(text):
-            """Collect TOC entries from list items with strong emphasis"""
-            # Look for strong tags in the text
+
+        def list_item_with_id(text):
+            """Add an id attribute to list items with strong emphasis, so TOC links can target them"""
             strong_match = re.search(r'<strong>([^<]+)</strong>', text)
             if strong_match:
-                key_name = strong_match.group(1).strip()
-                item_id = re.sub(r'[^a-zA-Z0-9_.-]', '-', key_name).strip('-').lower()
-                # Current depth is the last item in the stack minus 1 (0-indexed)
-                level = max(0, depth_stack[-1] - 1)
-                
-                md.toc_items.append({
-                    "id": item_id,
-                    "name": key_name,
-                    "level": level
-                })
-                
-                # Add id attribute to the list item
+                item_id = slugify(strong_match.group(1).strip())
                 return f'<li id="{item_id}">{text}</li>\n'
-            
+
             return original_list_item(text)
-        
-        # Replace renderer methods
-        md.renderer.list = list_with_depth
-        md.renderer.list_item = list_item_with_toc
+
+        md.renderer.list_item = list_item_with_id
 
     # -----------------------------
     # Markdown creation with plugins
