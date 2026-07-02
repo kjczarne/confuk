@@ -57,7 +57,7 @@ wheels = [
 
 [[package]]
 name = "confuk"
-version = "0.17.1"
+version = "0.17.2"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

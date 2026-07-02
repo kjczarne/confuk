@@ -310,7 +310,7 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
             position: sticky;
             top: 20px;
             max-height: calc(100vh - 40px);
-            overflow-y: auto;
+            overflow: auto;
         }}
         .toc summary {{
             cursor: pointer;
@@ -346,7 +346,7 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
             margin: 0.25em 0;
         }}
         .toc ul ul {{
-            padding-left: 1.5em;
+            padding-left: 2ch;
             margin-top: 0.25em;
         }}
         .toc li {{
@@ -357,6 +357,7 @@ def generate_html_from_markdown(md_text, output_file, title="Documentation"):
             text-decoration: none;
             display: block;
             padding: 0.2em 0;
+            white-space: nowrap;
         }}
         .toc a:hover {{
             color: #0550ae;
